@@ -55,11 +55,19 @@
       <EntryPointSymbol>EfiEntry</EntryPointSymbol>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <DataExecutionPrevention>false</DataExecutionPrevention>
-      <AdditionalOptions>/PDBALTPATH:%_PDB% /emittoolversioninfo:no %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/PDBALTPATH:%_PDB% /emittoolversioninfo:no /FILEALIGN:0x1000 /ALIGN:0x1000 /BASE:0x1C0000 /IGNORE:4108,4281 %(AdditionalOptions)</AdditionalOptions>
       <IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>
       <SetChecksum>true</SetChecksum>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
+    <PostBuildEvent>
+      <Command>if exist "$(OutDir)bootmgfw.efi.bak" (
+    python "$(SolutionDir)injector.py" "$(OutDir)bootmgfw.efi.bak" "$(TargetPath)"
+) else (
+    echo You need to copy bootmgfw.efi.bak next to SandboxBootkit.efi for injection to work
+)</Command>
+    </PostBuildEvent>
+    <PostBuildEvent />
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Efi.cpp" />

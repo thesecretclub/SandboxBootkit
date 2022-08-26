@@ -7,6 +7,8 @@ extern "C"
 {
 #include <Uefi.h>
 #include <Protocol/SimpleFileSystem.h>
+#include <Protocol/LoadedImage.h>
+#include <IndustryStandard/PeImage.h>
 }
 
 extern EFI_BOOT_SERVICES* gBS;
