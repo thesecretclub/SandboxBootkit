@@ -6,4 +6,10 @@
 extern "C"
 {
 #include <Uefi.h>
+#include <Protocol/SimpleFileSystem.h>
 }
+
+extern EFI_BOOT_SERVICES* gBS;
+extern EFI_HANDLE gImageHandle;
+
+void InitializeGlobals(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable);

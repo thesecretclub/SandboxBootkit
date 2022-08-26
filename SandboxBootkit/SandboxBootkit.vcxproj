@@ -62,6 +62,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Efi.cpp" />
     <ClCompile Include="EfiEntry.cpp" />
   </ItemGroup>
   <ItemGroup>
