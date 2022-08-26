@@ -1,4 +1,4 @@
 [submodule "edk2"]
 	path = edk2
-	url = https://github.com/tianocore/edk2
+	url = ../tianocore/edk2.git
 	shallow = true
