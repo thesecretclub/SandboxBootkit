@@ -5,6 +5,8 @@ VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SandboxBootkit", "SandboxBootkit\SandboxBootkit.vcxproj", "{00F9B865-9986-4D9C-BB53-7BB826522896}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Installer", "Installer\Installer.csproj", "{D3606CE8-4338-40BB-9CFD-20D931339BA0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Release|x64 = Release|x64
@@ -12,6 +14,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{00F9B865-9986-4D9C-BB53-7BB826522896}.Release|x64.ActiveCfg = Release|x64
 		{00F9B865-9986-4D9C-BB53-7BB826522896}.Release|x64.Build.0 = Release|x64
+		{D3606CE8-4338-40BB-9CFD-20D931339BA0}.Release|x64.ActiveCfg = Release|x64
+		{D3606CE8-4338-40BB-9CFD-20D931339BA0}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -61,10 +61,10 @@
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(OutDir)bootmgfw.efi.bak" (
-    python "$(SolutionDir)injector.py" "$(OutDir)bootmgfw.efi.bak" "$(TargetPath)"
+      <Command>if exist "$(OutDir)bootmgfw.bak" (
+    python "$(SolutionDir)Installer\injector.py" "$(OutDir)bootmgfw.bak" "$(TargetPath)"
 ) else (
-    echo You need to copy bootmgfw.efi.bak next to SandboxBootkit.efi for injection to work
+    echo You need to copy bootmgfw.bak next to SandboxBootkit.efi for injection to work
 )</Command>
     </PostBuildEvent>
     <PostBuildEvent />

