@@ -162,12 +162,12 @@ namespace Installer
             }
             else
             {
-                Console.WriteLine($"Running as {whoResult.Output.Trim()}, elevating to SYSTEM...");
-                var psExec = Path.Combine(basePath, "PsExec64.exe");
-                if (!File.Exists(psExec))
-                    Error("Failed to find PsExec64.exe");
+                Console.WriteLine($"Running as {whoResult.Output.Trim()}, elevating to TrustedInstaller...");
+                var sudo = Path.Combine(basePath, "NSudoLG.exe");
+                if (!File.Exists(sudo))
+                    Error("Failed to find NSudoLG.exe");
                 var selfLocation = Assembly.GetExecutingAssembly().Location;
-                Exec(psExec, $"-sid \"{selfLocation}\"");
+                Exec(sudo, $"-U:T -P:E -Wait \"{selfLocation}\"");
             }
         }
     }
