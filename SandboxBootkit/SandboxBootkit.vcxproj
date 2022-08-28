@@ -72,10 +72,12 @@
   <ItemGroup>
     <ClCompile Include="Efi.cpp" />
     <ClCompile Include="EfiEntry.cpp" />
+    <ClCompile Include="EfiUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="D:\CodeBlocks\SandboxBootkit\SandboxBootkit\ProcessorBind.hpp" />
     <ClInclude Include="Efi.hpp" />
+    <ClInclude Include="EfiUtils.hpp" />
+    <ClInclude Include="ProcessorBind.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

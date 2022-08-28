@@ -1,0 +1,24 @@
+﻿---
+BasedOnStyle: Microsoft
+AccessModifierOffset: '-4'
+ColumnLimit: 100
+AlignAfterOpenBracket: DontAlign
+AllowAllConstructorInitializersOnNextLine: 'false'
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortLambdasOnASingleLine: None
+AlwaysBreakTemplateDeclarations: 'Yes'
+BinPackArguments: 'false'
+BinPackParameters: 'false'
+BreakBeforeBraces: Allman
+BreakConstructorInitializers: BeforeComma
+ColumnLimit: '0'
+ConstructorInitializerAllOnOneLineOrOnePerLine: 'true'
+Cpp11BracedListStyle: 'false'
+PointerAlignment: Left
+SortIncludes: 'false'
+SortUsingDeclarations: 'false'
+SpaceAfterTemplateKeyword: 'false'
+TabWidth: '4'
+UseTab: Never
+
+...

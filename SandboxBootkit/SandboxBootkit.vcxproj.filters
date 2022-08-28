@@ -21,12 +21,18 @@
     <ClCompile Include="Efi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="EfiUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Efi.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="D:\CodeBlocks\SandboxBootkit\SandboxBootkit\ProcessorBind.hpp">
+    <ClInclude Include="EfiUtils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ProcessorBind.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
