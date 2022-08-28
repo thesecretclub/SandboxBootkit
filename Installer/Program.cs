@@ -139,31 +139,37 @@ namespace Installer
                     }
 
                     var bootkitPath = Path.Combine(basePath, "bootmgfw.efi");
-                    if (!File.Exists(bootkitPath))
+                    if (File.Exists(bootkitPath))
                     {
-                        Info("Injecting SandboxBootkit.efi into bootmgfw.bak");
-                        var sandboxBootkit = Path.Combine(basePath, "SandboxBootkit.efi");
-                        if (!File.Exists(sandboxBootkit))
-                            Error($"Bootkit not found ${sandboxBootkit}, please compile SandboxBootkit");
-
-                        Info("Running injector.py");
-                        var python = FindPython();
-                        if (string.IsNullOrEmpty(python))
-                            Error($"Failed to find python 3");
-
-                        var injector = Path.Combine(basePath, "injector.py");
-                        // TODO: redirect stderr?
-                        var pythonResult = Exec(python, $"\"{injector}\" \"{backupPath}\" \"{sandboxBootkit}\"");
-                        Console.WriteLine(pythonResult.Output);
-                        if (pythonResult.ExitCode != 0)
-                            Error($"Failed to inject bootkit!\n" + pythonResult.Output.Trim());
+                        Info($"Recreating injected bootmgfw.efi");
+                        File.Delete(bootkitPath);
                     }
+
+                    Info("Injecting SandboxBootkit.efi into bootmgfw.bak");
+                    var sandboxBootkit = Path.Combine(basePath, "SandboxBootkit.efi");
+                    if (!File.Exists(sandboxBootkit))
+                        Error($"Bootkit not found ${sandboxBootkit}, please compile SandboxBootkit");
+
+                    // TODO: rewrite this in C++
+                    Info("Running injector.py");
+                    var python = FindPython();
+                    if (string.IsNullOrEmpty(python))
+                        Error($"Failed to find python 3, download at: https://www.python.org/downloads/ (Note: install for all users)");
+
+                    var injector = Path.Combine(basePath, "injector.py");
+                    // TODO: redirect stderr?
+                    var pythonResult = Exec(python, $"\"{injector}\" \"{backupPath}\" \"{sandboxBootkit}\"");
+                    Console.WriteLine(pythonResult.Output);
+                    if (pythonResult.ExitCode != 0)
+                        Error($"Failed to inject bootkit!\n" + pythonResult.Output.Trim());
 
                     Info("Installing bootmgfw.efi with bootkit injected");
                     File.Copy(bootkitPath, bootmgfwPath, true);
 
                     Info("Bootkit installed: " + bootmgfwPath);
                     Console.WriteLine("Success!");
+
+                    // TODO: disable integrity checks (also in DebugLayer)
 
                     Console.WriteLine("\nPress any key to exit...");
                     Console.ReadKey();
