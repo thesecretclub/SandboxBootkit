@@ -53,43 +53,36 @@ namespace Installer
             };
         }
 
-        static string FindPython()
+        static bool IsNetworkPath(string path)
         {
-            string pythonPath = null;
-            using (var pythonCore = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Python\PythonCore"))
+            var rootPath = Path.GetPathRoot(path);
+            try
             {
-                if (pythonCore != null)
+                var info = new DriveInfo(rootPath);
+                if (info.DriveType == DriveType.Network)
                 {
-                    var maxVersion = 0;
-                    string maxVersionString = "";
-                    foreach (var pythonVersion in pythonCore.GetSubKeyNames())
-                    {
-                        var s = pythonVersion.Split('.');
-                        var major = int.Parse(s[0]);
-                        var minor = int.Parse(s[1]);
-                        var version = major * 10000 + minor;
-                        if (major >= 3 && version > maxVersion)
-                        {
-                            maxVersion = version;
-                            maxVersionString = pythonVersion;
-                        }
-                    }
-                    using (var maxPython = pythonCore.OpenSubKey(maxVersionString + "\\InstallPath"))
-                    {
-                        if (maxPython != null)
-                        {
-                            var executablePath = maxPython.GetValue("ExecutablePath") as string;
-                            return executablePath;
-                        }
-                    }
+                    return true;
                 }
-                return pythonPath;
+                return false;
+            }
+            catch
+            {
+                try
+                {
+                    return new Uri(rootPath).IsUnc;
+                }
+                catch
+                {
+                    return false;
+                }
             }
         }
 
         static void Main(string[] args)
         {
             var basePath = AppDomain.CurrentDomain.BaseDirectory;
+            if (IsNetworkPath(basePath))
+                Error("Running from a network path is not supported");
             var whoResult = Exec("whoami");
             if (whoResult.Output.ToLowerInvariant().Contains("system"))
             {
@@ -138,28 +131,19 @@ namespace Installer
                         File.Copy(bootmgfwBakPath, backupPath);
                     }
 
-                    var bootkitPath = Path.Combine(basePath, "bootmgfw.efi");
-                    if (File.Exists(bootkitPath))
-                    {
-                        Info($"Recreating injected bootmgfw.efi");
-                        File.Delete(bootkitPath);
-                    }
-
                     Info("Injecting SandboxBootkit.efi into bootmgfw.bak");
                     var sandboxBootkit = Path.Combine(basePath, "SandboxBootkit.efi");
                     if (!File.Exists(sandboxBootkit))
                         Error($"Bootkit not found ${sandboxBootkit}, please compile SandboxBootkit");
 
-                    // TODO: rewrite this in C++
-                    Info("Running injector.py");
-                    var python = FindPython();
-                    if (string.IsNullOrEmpty(python))
-                        Error($"Failed to find python 3, download at: https://www.python.org/downloads/ (Note: install for all users)");
+                    Info("Running injector");
 
-                    var injector = Path.Combine(basePath, "injector.py");
-                    // TODO: redirect stderr?
-                    var pythonResult = Exec(python, $"\"{injector}\" \"{backupPath}\" \"{sandboxBootkit}\"");
-                    Console.WriteLine(pythonResult.Output);
+                    var injector = Path.Combine(basePath, "Injector.exe");
+                    if (!File.Exists(injector))
+                        Error($"Injector not found: {injector}");
+                    var bootkitPath = Path.Combine(basePath, "bootmgfw.efi");
+                    var pythonResult = Exec(injector, $"\"{backupPath}\" \"{sandboxBootkit}\" \"{bootkitPath}\"");
+                    Console.WriteLine(pythonResult.Output.Trim());
                     if (pythonResult.ExitCode != 0)
                         Error($"Failed to inject bootkit!\n" + pythonResult.Output.Trim());
 
@@ -169,18 +153,32 @@ namespace Installer
                     Info("Bootkit installed: " + bootmgfwPath);
                     Console.WriteLine("Success!");
 
-                    // TODO: disable integrity checks (also in DebugLayer)
+                    void UpdateBcdFile(string root)
+                    {
+                        Info($"Setting NOINTEGRITYCHECKS in {root}");
+                        var bcdPath = Path.Combine(root, "EFI", "Microsoft", "Boot", "BCD");
+                        if (!File.Exists(bcdPath))
+                            Error($"Not found: {bcdPath}");
+                        var bcdeditResult = Exec("bcdedit", $"/store \"{bcdPath}\" /set {{bootmgr}} nointegritychecks on");
+                        Console.WriteLine(bcdeditResult.Output.Trim());
+                        if (bcdeditResult.ExitCode != 0)
+                            Error($"Failed to update: {bcdPath}");
+                    }
 
-                    Console.WriteLine("\nPress any key to exit...");
-                    Console.ReadKey();
+                    var debugLayer = Path.Combine(guid, "DebugLayer");
+                    if (Directory.Exists(debugLayer))
+                    {
+                        UpdateBcdFile(debugLayer);
+                    }
+                    UpdateBcdFile(Path.Combine(baseLayer, "Files"));
                 }
                 catch (Exception x)
                 {
                     Console.WriteLine(x);
-
-                    Console.WriteLine("\nPress any key to exit...");
-                    Console.ReadKey();
                 }
+
+                Console.WriteLine("\nPress any key to exit...");
+                Console.ReadKey();
             }
             else
             {

@@ -135,8 +135,7 @@ static EFI_STATUS BlImgLoadPEImageExHook(void* a1, void* a2, wchar_t* LoadFile, 
 
 static EFI_OPEN_PROTOCOL OpenProtocol = nullptr;
 
-static EFI_STATUS EFIAPI
-OpenProtocolHook(EFI_HANDLE Handle, EFI_GUID* Protocol, void** Interface, EFI_HANDLE AgentHandle, EFI_HANDLE ControllerHandle, uint32_t Attributes)
+static EFI_STATUS EFIAPI OpenProtocolHook(EFI_HANDLE Handle, EFI_GUID* Protocol, void** Interface, EFI_HANDLE AgentHandle, EFI_HANDLE ControllerHandle, uint32_t Attributes)
 {
     auto Status = OpenProtocol(Handle, Protocol, Interface, AgentHandle, ControllerHandle, Attributes);
 
@@ -169,7 +168,7 @@ static EFI_STATUS LoadBootManager()
 {
     // Query bootmgfw from the filesystem
     EFI_DEVICE_PATH* BootmgfwPath = nullptr;
-    auto Status = EfiQueryDevicePath(L"\\efi\\microsoft\\boot\\bootmgfw.efi", &BootmgfwPath);
+    auto Status = EfiQueryDevicePath(L"\\EFI\\Microsoft\\Boot\\bootmgfw.efi", &BootmgfwPath);
 
     if (EFI_ERROR(Status))
     {
@@ -202,6 +201,8 @@ static EFI_STATUS LoadBootManager()
 
 EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 {
+    // TODO: check for relocations and assert
+
     EfiInitializeGlobals(ImageHandle, SystemTable);
 
     // Get the EFI image base
