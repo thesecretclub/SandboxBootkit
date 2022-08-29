@@ -78,6 +78,24 @@ namespace Installer
             }
         }
 
+        static void SetDevelopmentMode(bool enabled, string baseLayer)
+        {
+            var verb = enabled ? "On" : "Off";
+            Info($"Turning development mode {verb.ToLower()}");
+            var cmDiagResult = Exec("CmDiag", $"DevelopmentMode -{verb}");
+            if (cmDiagResult.ExitCode != 0)
+                Error($"Failed to turn development mode {verb}");
+            // Wait for the BaseLayer to be mounted again
+            Info($"Waiting for BaseLayer to remount...");
+            for (var i = 0; i < 5; i++)
+            {
+                if (Directory.Exists(baseLayer))
+                    return;
+                System.Threading.Thread.Sleep(1000);
+            }
+            Error($"Could not wait for CmService, try rebooting");
+        }
+
         static void Main(string[] args)
         {
             var basePath = AppDomain.CurrentDomain.BaseDirectory;
@@ -105,6 +123,11 @@ namespace Installer
                     if (!Directory.Exists(baseLayer))
                         Error($"Directory not found: {baseLayer}, install & start Windows Sandbox");
                     Info($"BaseLayer: {baseLayer}");
+
+                    var debugLayer = Path.Combine(guid, "DebugLayer");
+                    var developmentMode = Directory.Exists(debugLayer);
+                    if (!developmentMode)
+                        SetDevelopmentMode(true, baseLayer);
 
                     var bootPath = Path.Combine(baseLayer, "Files", "EFI", "Microsoft", "Boot");
                     if (!Directory.Exists(bootPath))
@@ -156,21 +179,26 @@ namespace Installer
                     void UpdateBcdFile(string root)
                     {
                         Info($"Setting NOINTEGRITYCHECKS in {root}");
-                        var bcdPath = Path.Combine(root, "EFI", "Microsoft", "Boot", "BCD");
+                        var bcdFolder = Path.Combine(root, "EFI", "Microsoft", "Boot");
+                        var bcdPath = Path.Combine(bcdFolder, "BCD");
                         if (!File.Exists(bcdPath))
                             Error($"Not found: {bcdPath}");
+                        var bakPath = bcdPath + ".bak";
+                        if (!File.Exists(bakPath))
+                            File.Copy(bcdPath, bakPath);
                         var bcdeditResult = Exec("bcdedit", $"/store \"{bcdPath}\" /set {{bootmgr}} nointegritychecks on");
                         Console.WriteLine(bcdeditResult.Output.Trim());
                         if (bcdeditResult.ExitCode != 0)
                             Error($"Failed to update: {bcdPath}");
                     }
 
-                    var debugLayer = Path.Combine(guid, "DebugLayer");
                     if (Directory.Exists(debugLayer))
-                    {
                         UpdateBcdFile(debugLayer);
-                    }
                     UpdateBcdFile(Path.Combine(baseLayer, "Files"));
+
+                    // Restore development mode (startup performance is horrendous when development mode is enabled)
+                    if (!developmentMode)
+                        SetDevelopmentMode(false, baseLayer);
                 }
                 catch (Exception x)
                 {
