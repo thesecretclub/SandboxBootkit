@@ -17,9 +17,14 @@ jobs:
     
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.2
+
+    - uses: nuget/setup-nuget@v1
+      with:
+        nuget-version: '5.x'
     
     - name: Build
       run: |
+        nuget restore ${{ github.event.repository.name }}.sln
         msbuild.exe ${{ github.event.repository.name }}.sln /m /verbosity:minimal /t:Rebuild /p:Configuration=Release /p:Platform=x64
     
     - uses: actions/upload-artifact@v2

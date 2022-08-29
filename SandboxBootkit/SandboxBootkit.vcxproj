@@ -80,8 +80,8 @@
     <ClInclude Include="ProcessorBind.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Injector\Injector.vcxproj">
-      <Project>{7d9f180e-70d2-4b1e-92cd-f462027d8c75}</Project>
+    <ProjectReference Include="..\Injector\Injector.csproj">
+      <Project>{1fc97804-ff0d-40f9-a772-213a46dfa1ec}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
