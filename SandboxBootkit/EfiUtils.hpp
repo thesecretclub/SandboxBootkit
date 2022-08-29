@@ -1,14 +1,21 @@
 #pragma once
 
-#include "Efi.hpp"
+static const size_t DetourSize = 12;
+static const uint64_t Fnv1aValue = 0xCBF29CE484222325;
+static const uint64_t Fnv1aPrime = 0x100000001B3;
 
-static constexpr size_t JmpSize = 12;
-static constexpr uint64_t Const64Val = 0xcbf29ce484222325;
-static constexpr uint64_t Const64Prime = 0x100000001b3;
-
-inline constexpr uint64_t Fnv1a(const char* const Str, const uint64_t Value = Const64Val) noexcept
+inline uint64_t Fnv1a(const char* Str)
 {
-    return (Str[0] == '\0') ? Value : Fnv1a(&Str[1], (Value ^ uint32_t((Str[0] >= 'A' && Str[0] <= 'Z') ? Str[0] - ('A' - 'a') : Str[0])) * Const64Prime);
+    auto Value = Fnv1aValue;
+    auto Len = (Str != nullptr) ? strlen(Str) : 0;
+
+    for (size_t i = 0; i < Len; i++)
+    {
+        Value ^= uint32_t((Str[i] >= 'A' && Str[i] <= 'Z') ? (Str[i] - ('A' - 'a')) : Str[i]);
+        Value *= Fnv1aPrime;
+    }
+
+    return Value;
 }
 
 template<typename R, typename T>
@@ -18,23 +25,23 @@ R RVA(T Ptr, int64_t Offset)
 }
 
 template<typename Func>
-void DetourCreate(Func* OriginalFunction, Func* HookFunction, uint8_t OriginalBytes[JmpSize])
+void DetourCreate(Func* OriginalFunction, Func* HookFunction, uint8_t OriginalBytes[DetourSize])
 {
     // Copy the function to the original bytes
-    memcpy(OriginalBytes, OriginalFunction, JmpSize);
+    memcpy(OriginalBytes, OriginalFunction, DetourSize);
 
     // Create a 64-bit mov rax; jmp rax
-    memcpy(OriginalFunction, "\x48\xB8\xEF\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xFF\xE0", JmpSize);
+    memcpy(OriginalFunction, "\x48\xB8\xEF\xCC\xCC\xCC\xCC\xCC\xCC\xCC\xFF\xE0", DetourSize);
 
     // Overwrite rax to the hook function
     *RVA<void**>(OriginalFunction, 2) = HookFunction;
 }
 
 template<typename Func>
-void DetourRestore(Func* OriginalFunction, uint8_t OriginalBytes[JmpSize])
+void DetourRestore(Func* OriginalFunction, uint8_t OriginalBytes[DetourSize])
 {
     // Copy the original bytes to the function
-    memcpy(OriginalFunction, OriginalBytes, JmpSize);
+    memcpy(OriginalFunction, OriginalBytes, DetourSize);
 }
 
 EFI_IMAGE_NT_HEADERS64* GetNtHeaders(void* ImageBase);
@@ -43,6 +50,5 @@ void* GetExport(void* ImageBase, const char* FunctionName, const char* ModuleNam
 bool ComparePattern(uint8_t* Base, uint8_t* Pattern, size_t PatternLen);
 uint8_t* FindPattern(uint8_t* Base, size_t Size, uint8_t* Pattern, size_t PatternLen);
 void Die();
-EFI_STATUS QueryDevicePath(const wchar_t* FilePath, EFI_DEVICE_PATH** OutDevicePath);
 
 #define FIND_PATTERN(Base, Size, Pattern) FindPattern((uint8_t*)Base, Size, (uint8_t*)Pattern, ARRAY_SIZE(Pattern) - 1);

@@ -20,13 +20,15 @@ extern "C"
 #include <IndustryStandard/PeImage.h>
 }
 
+#include "EfiUtils.hpp"
+
 extern "C" EFI_IMAGE_DOS_HEADER __ImageBase;
 
 extern EFI_HANDLE gImageHandle;
 extern EFI_SYSTEM_TABLE* gST;
 extern EFI_BOOT_SERVICES* gBS;
-extern EFI_DEVICE_PATH_UTILITIES_PROTOCOL* gDevicePathLibDevicePathUtilities;
 
-void InitializeGlobals(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable);
-
-typedef EFI_STATUS (*BlImgLoadPEImageEx_t)(void*, void*, wchar_t*, void**, uint64_t*, void*, void*, void*, void*, void*, void*, void*, void*, void*);
+void EfiInitializeGlobals(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable);
+EFI_STATUS EfiFileDevicePath(EFI_HANDLE Device, const wchar_t* FileName, EFI_DEVICE_PATH** NewDevicePath);
+EFI_STATUS EfiQueryDevicePath(const wchar_t* FilePath, EFI_DEVICE_PATH** OutDevicePath);
+void* EfiRelocateImage(void* ImageBase);

