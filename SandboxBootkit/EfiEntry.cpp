@@ -165,6 +165,8 @@ static void HookBootServices()
     // Hook open protocol
     OpenProtocol = gBS->OpenProtocol;
     gBS->OpenProtocol = OpenProtocolHook;
+
+    // TODO: comment where this is called in winload.efi
 }
 
 static EFI_STATUS LoadBootManager()

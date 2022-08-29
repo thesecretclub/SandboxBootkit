@@ -94,7 +94,7 @@ namespace Installer
             var cmDiagResult = Exec("CmDiag", $"DevelopmentMode -{verb}");
             if (cmDiagResult.ExitCode != 0)
                 Error($"Failed to turn development mode {verb} (sandbox running?)");
-            
+
             // It can take a while until the BaseLayer.vhdx is remounted properly
             Info($"Waiting for BaseLayer to remount...");
             for (var i = 0; i < timeoutMs / 100; i++)
@@ -126,6 +126,12 @@ namespace Installer
                 var basePath = AppDomain.CurrentDomain.BaseDirectory;
                 if (IsNetworkPath(basePath))
                     Error("Running from a network path is not supported");
+                foreach (var file in Directory.EnumerateFiles(basePath))
+                {
+                    var zoneFile = file + ":Zone.Identifier";
+                    if (File.Exists(zoneFile))
+                        File.Delete(zoneFile);
+                }
                 var whoResult = Exec("whoami");
                 if (whoResult.Output.ToLowerInvariant().Contains("system"))
                 {
@@ -134,7 +140,7 @@ namespace Installer
                     var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
                     var baseImages = Path.Combine(programData, "Microsoft", "Windows", "Containers", "BaseImages");
                     if (!Directory.Exists(baseImages))
-                        Error($"Directory not found: {baseImages}");
+                        Error($"Directory not found: {baseImages}, install & start Windows Sandbox");
                     Info($"BaseImages: {baseImages}");
 
                     var guid = Directory.EnumerateDirectories(baseImages).FirstOrDefault();
@@ -223,12 +229,15 @@ namespace Installer
                         // Without this the sandbox can use a snapshot and load the original bootmgfw.efi
                         Info($"Deleting sandbox snapshots");
                         var snapshotFolder = Path.Combine(guid, "Snapshot");
-                        Directory.Delete(snapshotFolder, true);
-                        Info($"Restarting CmService");
-                        Exec("sc", "stop CmService");
-                        WaitForService("CmService", "STOPPED");
-                        Exec("sc", "start CmService");
-                        WaitForService("CmService", "RUNNING");
+                        if (Directory.Exists(snapshotFolder))
+                        {
+                            Directory.Delete(snapshotFolder, true);
+                            Info($"Restarting CmService");
+                            Exec("sc", "stop CmService");
+                            WaitForService("CmService", "STOPPED");
+                            Exec("sc", "start CmService");
+                            WaitForService("CmService", "RUNNING");
+                        }
                     }
                     finally
                     {
