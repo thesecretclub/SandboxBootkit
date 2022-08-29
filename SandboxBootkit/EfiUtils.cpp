@@ -126,14 +126,25 @@ bool FixRelocations(void* ImageBase, uint64_t ImageBaseDelta)
             {
                 auto RelocType = (Reloc & 0xF000) >> 12;
                 auto RelocRva = BaseReloc->VirtualAddress + (Reloc & 0xFFF);
-                auto RelocPtr = RVA<uint64_t*>(ImageBase, RelocRva);
+                auto RelocPtr = RVA<char*>(ImageBase, RelocRva);
 
-                if (RelocType == EFI_IMAGE_REL_BASED_DIR64)
+                switch (RelocType)
                 {
-                    *RelocPtr += ImageBaseDelta;
-                }
-                else
-                {
+                case EFI_IMAGE_REL_BASED_ABSOLUTE:
+                    break;
+                case EFI_IMAGE_REL_BASED_HIGH:
+                    (*(uint16_t*)RelocPtr) += HIWORD(((uint16_t)ImageBaseDelta));
+                    break;
+                case EFI_IMAGE_REL_BASED_LOW:
+                    (*(uint16_t*)RelocPtr) += LOWORD(((uint16_t)ImageBaseDelta));
+                    break;
+                case EFI_IMAGE_REL_BASED_HIGHLOW:
+                    (*(uint32_t*)RelocPtr) += ((uint32_t)ImageBaseDelta);
+                    break;
+                case EFI_IMAGE_REL_BASED_DIR64:
+                    (*(uint64_t*)RelocPtr) += ImageBaseDelta;
+                    break;
+                default:
                     return false;
                 }
             }

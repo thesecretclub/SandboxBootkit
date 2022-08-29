@@ -22,6 +22,9 @@ extern "C"
 
 #include "EfiUtils.hpp"
 
+#define LOWORD(l) ((uint16_t)(l))
+#define HIWORD(l) ((uint16_t)(((uint32_t)(l) >> 16) & 0xFFFF)) 
+
 extern "C" EFI_IMAGE_DOS_HEADER __ImageBase;
 
 extern EFI_HANDLE gImageHandle;
