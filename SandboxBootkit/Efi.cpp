@@ -154,9 +154,10 @@ void* EfiRelocateImage(void* ImageBase)
 
     // Allocate a new image buffer
     auto ImageSize = (size_t)NtHeaders->OptionalHeader.SizeOfImage;
+    auto ImagePages = EFI_SIZE_TO_PAGES(ImageSize);
 
     EFI_PHYSICAL_ADDRESS NewAddress = 0;
-    auto Status = gBS->AllocatePages(AllocateAnyPages, EfiBootServicesCode, EFI_SIZE_TO_PAGES(ImageSize), &NewAddress);
+    auto Status = gBS->AllocatePages(AllocateAnyPages, EfiBootServicesCode, ImagePages, &NewAddress);
 
     if (EFI_ERROR(Status))
     {
@@ -164,9 +165,17 @@ void* EfiRelocateImage(void* ImageBase)
     }
 
     // Copy the image data
-    void* NewImageBase = (void*)NewAddress;
+    auto NewImageBase = (void*)NewAddress;
 
     memcpy(NewImageBase, ImageBase, ImageSize);
+
+    // Fix the relocations
+    if (!FixRelocations(NewImageBase, (uint64_t)NewImageBase - (uint64_t)ImageBase))
+    {
+        gBS->FreePages(NewAddress, ImagePages);
+
+        return nullptr;
+    }
 
     return NewImageBase;
 }

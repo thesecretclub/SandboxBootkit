@@ -90,6 +90,63 @@ void* GetExport(void* ImageBase, const char* FunctionName, const char* ModuleNam
     return nullptr;
 }
 
+bool FixRelocations(void* ImageBase, uint64_t ImageBaseDelta)
+{
+    if (ImageBaseDelta == 0)
+    {
+        return true;
+    }
+
+    auto NtHeaders = GetNtHeaders(ImageBase);
+    if (NtHeaders == nullptr)
+    {
+        return false;
+    }
+
+    auto DataDir =
+        &NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_BASERELOC];
+    if (DataDir->VirtualAddress == 0 || DataDir->Size == 0)
+    {
+        return true;
+    }
+
+    auto BaseReloc =
+        RVA<EFI_IMAGE_BASE_RELOCATION*>(ImageBase, DataDir->VirtualAddress);
+    auto RelocsSize = DataDir->Size;
+
+    while (RelocsSize > 0 && BaseReloc->SizeOfBlock)
+    {
+        auto NumberOfRelocs = (BaseReloc->SizeOfBlock - EFI_IMAGE_SIZEOF_BASE_RELOCATION) / sizeof(uint16_t);
+        auto Relocs = RVA<uint16_t*>(BaseReloc, 8);
+
+        for (size_t i = 0; i < NumberOfRelocs; i++)
+        {
+            auto Reloc = Relocs[i];
+            if (Reloc != 0)
+            {
+                auto RelocType = (Reloc & 0xF000) >> 12;
+                auto RelocRva = BaseReloc->VirtualAddress + (Reloc & 0xFFF);
+                auto RelocPtr = RVA<uint64_t*>(ImageBase, RelocRva);
+
+                if (RelocType == EFI_IMAGE_REL_BASED_DIR64)
+                {
+                    *RelocPtr += ImageBaseDelta;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
+        BaseReloc =
+            RVA<EFI_IMAGE_BASE_RELOCATION*>(BaseReloc, BaseReloc->SizeOfBlock);
+        RelocsSize -= BaseReloc->SizeOfBlock;
+    }
+
+    return true;
+}
+
 bool ComparePattern(uint8_t* Base, uint8_t* Pattern, size_t PatternLen)
 {
     for (; PatternLen; ++Base, ++Pattern, PatternLen--)

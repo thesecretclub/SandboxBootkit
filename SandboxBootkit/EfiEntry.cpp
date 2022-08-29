@@ -101,7 +101,7 @@ static bool IsNtoskrnl(const wchar_t* ImageName)
     static const wchar_t Ntoskrnl[] = L"ntoskrnl.exe";
     static const size_t NtoskrnlLen = ARRAY_SIZE(Ntoskrnl) - 1;
 
-    size_t ImageNameLen = wcslen(ImageName);
+    auto ImageNameLen = wcslen(ImageName);
     if (ImageNameLen < NtoskrnlLen)
     {
         return false;
@@ -201,8 +201,6 @@ static EFI_STATUS LoadBootManager()
 
 EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable)
 {
-    // TODO: check for relocations and assert
-
     EfiInitializeGlobals(ImageHandle, SystemTable);
 
     // Get the EFI image base
@@ -213,19 +211,28 @@ EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable
         return Status;
     }
 
+    // Set the default error
+    Status = EFI_UNSUPPORTED;
+
     // Check if we are currently running as an injected section
     auto ImageBase = &__ImageBase;
     if (EfiImage->ImageBase != ImageBase)
     {
-        // Install boot services hook
-        HookBootServices();
-
-        // Call the original entry point (embedded in the bootkit PE)
+        // Fix relocations manually
         auto NtHeaders = GetNtHeaders(ImageBase);
-        auto OriginalEntryRva = NtHeaders->OptionalHeader.AddressOfEntryPoint;
-        auto OriginalEntry = RVA<decltype(&EfiEntry)>(EfiImage->ImageBase, OriginalEntryRva);
+        auto NtImageBase = NtHeaders->OptionalHeader.ImageBase;
 
-        Status = OriginalEntry(ImageHandle, SystemTable);
+        if (FixRelocations(ImageBase, (uint64_t)ImageBase - (uint64_t)NtImageBase))
+        {
+            // Install boot services hook
+            HookBootServices();
+
+            // Call the original entry point (embedded in the bootkit PE)
+            auto OriginalEntryRva = NtHeaders->OptionalHeader.AddressOfEntryPoint;
+            auto OriginalEntry = RVA<decltype(&EfiEntry)>(EfiImage->ImageBase, OriginalEntryRva);
+
+            Status = OriginalEntry(ImageHandle, SystemTable);
+        }
     }
     // Relocate the image to a new base
     else if (auto NewImageBase = EfiRelocateImage(ImageBase))
@@ -234,7 +241,7 @@ EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable
         auto RelocLoadBootManagerRva = ((uint64_t)&LoadBootManager - (uint64_t)ImageBase);
         auto RelocLoadBootManager = RVA<decltype(&LoadBootManager)>(NewImageBase, RelocLoadBootManagerRva);
 
-        Status = LoadBootManager();
+        Status = RelocLoadBootManager();
     }
 
     return Status;
