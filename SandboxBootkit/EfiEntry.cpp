@@ -42,6 +42,9 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
     {
         Die();
     }
+
+    // NOTE: EfiGuard has some additional patches, but they do not seem necessary
+    // https://github.com/Mattiwatti/EfiGuard/blob/25bb182026d24944713e36f129a93d08397de913/EfiGuardDxe/PatchNtoskrnl.c#L30-L47
 }
 
 static void DisableDSE(void* ImageBase, uint64_t ImageSize)

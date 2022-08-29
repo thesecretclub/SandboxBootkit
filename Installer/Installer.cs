@@ -87,7 +87,7 @@ namespace Installer
             }
         }
 
-        static void SetDevelopmentMode(bool enabled, string baseLayer)
+        static void SetDevelopmentMode(bool enabled, string baseLayer, int timeoutMs = 10000)
         {
             var verb = enabled ? "On" : "Off";
             Info($"Turning development mode {verb.ToLower()}");
@@ -97,7 +97,7 @@ namespace Installer
             
             // It can take a while until the BaseLayer.vhdx is remounted properly
             Info($"Waiting for BaseLayer to remount...");
-            for (var i = 0; i < 50; i++)
+            for (var i = 0; i < timeoutMs / 100; i++)
             {
                 if (Directory.Exists(baseLayer))
                     return;
@@ -106,7 +106,7 @@ namespace Installer
             Error($"Could not wait for CmService, try rebooting");
         }
 
-        static bool WaitForService(string service, string expectedStatus, int timeoutMs = 5000)
+        static bool WaitForService(string service, string expectedStatus, int timeoutMs = 10000)
         {
             Info($"Waiting for {service} to be {expectedStatus}");
             for (var i = 0; i < timeoutMs / 100; i++)
