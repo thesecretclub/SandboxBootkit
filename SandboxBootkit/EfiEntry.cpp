@@ -162,11 +162,9 @@ static EFI_STATUS EFIAPI OpenProtocolHook(EFI_HANDLE Handle, EFI_GUID* Protocol,
 
 static void HookBootServices()
 {
-    // Hook open protocol
+    // Hook open protocol (called via BlInitializeLibrary -> ... -> EfiOpenProtocol)
     OpenProtocol = gBS->OpenProtocol;
     gBS->OpenProtocol = OpenProtocolHook;
-
-    // TODO: comment where this is called in winload.efi
 }
 
 static EFI_STATUS LoadBootManager()

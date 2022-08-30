@@ -8,8 +8,11 @@ Bootkit tested on [Windows Sandbox](https://docs.microsoft.com/en-us/windows/sec
 - Run `Installer.exe`;
 - Start Windows Sandbox.
 
+**Note**: (parts of) the release might be detected as a virus by Windows Defender. This is a false positive, so you might need to add an exclusion.
+
 ## Development
 
+- Clone the project (with submodules);
 - Use `SandboxBootkit.sln` to build the project;
 - Look at the `Installer` project on how to install the bootkit.
 
