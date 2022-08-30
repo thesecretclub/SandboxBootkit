@@ -208,6 +208,30 @@ static void DisableDSE(void* ImageBase, uint64_t ImageSize)
     {
         Die();
     }
+
+    /*
+    nt!SeCodeIntegrityQueryInformation
+    PAGE:00000001406FFB30 48 83 EC 38                             sub     rsp, 38h
+    PAGE:00000001406FFB34 48 83 3D BC DD 51 00 00                 cmp     cs:qword_140C1D8F8, 0
+    PAGE:00000001406FFB3C 4D 8B C8                                mov     r9, r8
+    PAGE:00000001406FFB3F 4C 8B D1                                mov     r10, rcx
+    PAGE:00000001406FFB42 74 2F                                   jz      short loc_1406FFB73
+    */
+    auto SeCodeIntegrityQueryInformation = FIND_PATTERN(PageBase, PageSize, "\x48\x83\xEC\xCC\x48\x83\x3D\xCC\xCC\xCC\xCC\x00\x4D\x8B\xC8\x4C\x8B\xD1\x74");
+    if (SeCodeIntegrityQueryInformation != nullptr)
+    {
+        /*
+        mov dword ptr [r8], 8
+        xor eax, eax
+        mov dword ptr [rcx+4], 1
+        ret
+        */
+        memcpy(SeCodeIntegrityQueryInformation, "\x41\xC7\x00\x08\x00\x00\x00\x33\xC0\xC7\x41\x04\x01\x00\x00\x00\xC3", 17);
+    }
+    else
+    {
+        Die();
+    }
 }
 
 static void HookNtoskrnl(void* ImageBase, uint64_t ImageSize)
