@@ -48,6 +48,7 @@ EFI_IMAGE_NT_HEADERS64* GetNtHeaders(void* ImageBase);
 void* FindImageBase(uint64_t Address, size_t MaxSize = (1 * 1024 * 1024));
 void* GetExport(void* ImageBase, const char* FunctionName, const char* ModuleName = nullptr);
 bool FixRelocations(void* ImageBase, uint64_t ImageBaseDelta);
+uint8_t* FindFunctionStart(void* ImageBase, void* Address);
 bool ComparePattern(uint8_t* Base, uint8_t* Pattern, size_t PatternLen);
 uint8_t* FindPattern(uint8_t* Base, size_t Size, uint8_t* Pattern, size_t PatternLen);
 void Die();

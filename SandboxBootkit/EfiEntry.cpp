@@ -192,10 +192,7 @@ static void PatchSelfIntegrity(void* ImageBase, uint64_t ImageSize)
     auto VerifySelfIntegrityMid = FIND_PATTERN(ImageBase, ImageSize, "\x83\x4D\xCC\xFF\x83\x4D\xCC\xFF");
     if (VerifySelfIntegrityMid != nullptr)
     {
-        // Find the function start (NOTE: would be cleaner to use the RUNTIME_FUNCTION in the exception directory)
-        // mov [rsp+8], ecx
-        constexpr auto WalkBack = 0x30;
-        auto BmFwVerifySelfIntegrity = FIND_PATTERN(VerifySelfIntegrityMid - WalkBack, WalkBack, "\x89\x4C\x24\x08");
+        auto BmFwVerifySelfIntegrity = FindFunctionStart(ImageBase, VerifySelfIntegrityMid);
         if (BmFwVerifySelfIntegrity != nullptr)
         {
             memcpy(BmFwVerifySelfIntegrity, "\x33\xC0\xC3", 3); // xor eax, eax; ret
