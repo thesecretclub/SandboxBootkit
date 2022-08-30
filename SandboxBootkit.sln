@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SandboxBootkit", "SandboxBootkit\SandboxBootkit.vcxproj", "{00F9B865-9986-4D9C-BB53-7BB826522896}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1FC97804-FF0D-40F9-A772-213A46DFA1EC} = {1FC97804-FF0D-40F9-A772-213A46DFA1EC}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Installer", "Installer\Installer.csproj", "{D3606CE8-4338-40BB-9CFD-20D931339BA0}"
 EndProject

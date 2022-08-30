@@ -62,7 +62,7 @@
     </Link>
     <PostBuildEvent>
       <Command>if exist "$(OutDir)bootmgfw.bak" (
-    "$(OutDir)Injector.exe" "$(OutDir)bootmgfw.bak" "$(TargetPath)" "$(OutDir)bootmgfw.efi"
+    "$(OutDir)Injector\Injector.exe" "$(OutDir)bootmgfw.bak" "$(TargetPath)" "$(OutDir)bootmgfw.efi"
 ) else (
     echo You need to copy bootmgfw.bak next to SandboxBootkit.efi for automatic injection
 )</Command>
@@ -78,11 +78,6 @@
     <ClInclude Include="Efi.hpp" />
     <ClInclude Include="EfiUtils.hpp" />
     <ClInclude Include="ProcessorBind.hpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Injector\Injector.csproj">
-      <Project>{1fc97804-ff0d-40f9-a772-213a46dfa1ec}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
