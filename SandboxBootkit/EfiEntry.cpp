@@ -13,7 +13,7 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
 
     auto KeInitAmd64SpecificStateJmp = FIND_PATTERN(ImageBase, ImageSize, "\x8B\xC2\x99\x41\xF7\xF8");
 
-    if (KeInitAmd64SpecificStateJmp)
+    if (KeInitAmd64SpecificStateJmp != nullptr)
     {
         // Prevent the mov from modifying the return address
         memset(RVA<void*>(KeInitAmd64SpecificStateJmp, 6), 0x90, 4); // nop x4
@@ -33,7 +33,7 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
 
     auto KiSwInterruptDispatchCall = FIND_PATTERN(ImageBase, ImageSize, "\xFB\x48\x8D\xCC\xCC\xE8\xCC\xCC\xCC\xCC\xFA");
 
-    if (KiSwInterruptDispatchCall)
+    if (KiSwInterruptDispatchCall != nullptr)
     {
         // Prevent KiSwInterruptDispatch from being executed
         memset(KiSwInterruptDispatchCall, 0x90, 11); // nop x11
@@ -58,7 +58,7 @@ static void DisableDSE(void* ImageBase, uint64_t ImageSize)
 
     auto CiInitializeCall = FIND_PATTERN(ImageBase, ImageSize, "\x4C\x8D\x05\xCC\xCC\xCC\xCC\x8B\xCF");
 
-    if (CiInitializeCall)
+    if (CiInitializeCall != nullptr)
     {
         // Change CodeIntegrityOptions to zero for CiInitialize call
         *RVA<uint16_t*>(CiInitializeCall, 7) = 0xC931; // xor ecx, ecx
@@ -82,7 +82,7 @@ static void DisableDSE(void* ImageBase, uint64_t ImageSize)
 
     auto SeValidateImageDataRet = FIND_PATTERN(ImageBase, ImageSize, "\x48\x83\xC4\x48\xC3\xCC\xB8\x28\x04\x00\xC0");
 
-    if (SeValidateImageDataRet)
+    if (SeValidateImageDataRet != nullptr)
     {
         // Ensure SeValidateImageData returns a success status
         *RVA<uint32_t*>(SeValidateImageDataRet, 7) = 0; // mov eax, 0
@@ -167,16 +167,6 @@ static void HookBootServices()
     gBS->OpenProtocol = OpenProtocolHook;
 }
 
-typedef uint32_t (*BmFwVerifySelfIntegrity_t)();
-static BmFwVerifySelfIntegrity_t BmFwVerifySelfIntegrity = nullptr;
-static uint8_t BmFwVerifySelfIntegrityOriginal[DetourSize];
-
-static uint32_t BmFwVerifySelfIntegrityHook()
-{
-    DetourRestore(BmFwVerifySelfIntegrity, BmFwVerifySelfIntegrityOriginal);
-    return 0;
-}
-
 static void HookBootmgfw(void* ImageBase, uint64_t ImageSize)
 {
     /*
@@ -199,20 +189,26 @@ static void HookBootmgfw(void* ImageBase, uint64_t ImageSize)
     .text:000000001002AE86 83 4D 40 FF           or      [rbp+a1], 0FFFFFFFFh
     */
     auto VerifySelfIntegrityMid = FIND_PATTERN(ImageBase, ImageSize, "\x83\x4D\xCC\xFF\x83\x4D\xCC\xFF");
-    if (VerifySelfIntegrityMid == nullptr)
+    if (VerifySelfIntegrityMid != nullptr)
+    {
+        // Find the function start (NOTE: would be cleaner to use the RUNTIME_FUNCTION in the exception directory)
+        // mov [rsp+8], ecx
+        constexpr auto WalkBack = 0x30;
+        auto BmFwVerifySelfIntegrity = FIND_PATTERN(VerifySelfIntegrityMid - WalkBack, WalkBack, "\x89\x4C\x24\x08");
+        if (BmFwVerifySelfIntegrity != nullptr)
+        {
+            // xor eax, eax; ret
+            memcpy(BmFwVerifySelfIntegrity, "\x33\xC0\xC3", 3);
+        }
+        else
+        {
+            Die();
+        }
+    }
+    else
     {
         Die();
     }
-
-    // Find the function start (NOTE: would be cleaner to use the RUNTIME_FUNCTION in the exception directory)
-    // mov [rsp+8], ecx
-    BmFwVerifySelfIntegrity = (BmFwVerifySelfIntegrity_t)FIND_PATTERN(VerifySelfIntegrityMid - 0x30, ImageSize - (VerifySelfIntegrityMid - (uint8_t*)ImageBase), "\x89\x4C\x24\x08");
-    if (BmFwVerifySelfIntegrity == nullptr)
-    {
-        Die();
-    }
-
-    DetourCreate(BmFwVerifySelfIntegrity, BmFwVerifySelfIntegrityHook, BmFwVerifySelfIntegrityOriginal);
 }
 
 static EFI_STATUS LoadBootManager()
