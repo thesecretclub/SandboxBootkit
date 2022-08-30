@@ -1,7 +1,32 @@
 #include "Efi.hpp"
 
+static void PatchReturn0(void* Function)
+{
+    memcpy(Function, "\x33\xC0\xC3", 3); // xor eax, eax; ret
+}
+
 static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
 {
+    // Find the section ranges because some sections are NOACCESS
+    auto InitSection = FindSection(ImageBase, "INIT");
+    if (InitSection == nullptr)
+    {
+        Die();
+    }
+    auto InitBase = RVA<uint8_t*>(ImageBase, InitSection->VirtualAddress);
+    auto InitSize = InitSection->Misc.VirtualSize;
+
+    auto TextSection = FindSection(ImageBase, ".text");
+    if (TextSection == nullptr)
+    {
+        Die();
+    }
+    auto TextBase = RVA<uint8_t*>(ImageBase, TextSection->VirtualAddress);
+    auto TextSize = TextSection->Misc.VirtualSize;
+
+    // These patch locations are the same as EfiGuard:
+    // https://github.com/Mattiwatti/EfiGuard/blob/25bb182026d24944713e36f129a93d08397de913/EfiGuardDxe/PatchNtoskrnl.c
+
     /*
     nt!KeInitAmd64SpecificState
     INIT:0000000140A4F601 8B C2                  mov     eax, edx
@@ -11,7 +36,7 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
     INIT:0000000140A4F60B EB 00                  jmp     short $+2
     */
 
-    auto KeInitAmd64SpecificStateJmp = FIND_PATTERN(ImageBase, ImageSize, "\x8B\xC2\x99\x41\xF7\xF8");
+    auto KeInitAmd64SpecificStateJmp = FIND_PATTERN(InitBase, InitSize, "\x8B\xC2\x99\x41\xF7\xF8");
 
     if (KeInitAmd64SpecificStateJmp != nullptr)
     {
@@ -31,7 +56,7 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
     .text:00000001403FD258 FA                    cli
     */
 
-    auto KiSwInterruptDispatchCall = FIND_PATTERN(ImageBase, ImageSize, "\xFB\x48\x8D\xCC\xCC\xE8\xCC\xCC\xCC\xCC\xFA");
+    auto KiSwInterruptDispatchCall = FIND_PATTERN(TextBase, TextSize, "\xFB\x48\x8D\xCC\xCC\xE8\xCC\xCC\xCC\xCC\xFA");
 
     if (KiSwInterruptDispatchCall != nullptr)
     {
@@ -43,12 +68,104 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
         Die();
     }
 
-    // NOTE: EfiGuard has some additional patches, but they do not seem necessary
-    // https://github.com/Mattiwatti/EfiGuard/blob/25bb182026d24944713e36f129a93d08397de913/EfiGuardDxe/PatchNtoskrnl.c#L30-L47
+    /*
+    nt!KiVerifyScopesExecute
+    INIT:0000000140A16060 48 8B C4                                      mov     rax, rsp
+    INIT:0000000140A16063 48 89 58 08                                   mov     [rax+8], rbx
+    INIT:0000000140A16067 48 89 70 10                                   mov     [rax+10h], rsi
+    INIT:0000000140A1606B 48 89 78 18                                   mov     [rax+18h], rdi
+    INIT:0000000140A1606F 4C 89 78 20                                   mov     [rax+20h], r15
+    INIT:0000000140A16073 55                                            push    rbp
+    INIT:0000000140A16074 48 8B EC                                      mov     rbp, rsp
+    INIT:0000000140A16077 48 83 EC 60                                   sub     rsp, 60h
+    INIT:0000000140A1607B 83 65 F4 00                                   and     [rbp+var_C], 0
+    INIT:0000000140A1607F 0F 57 C0                                      xorps   xmm0, xmm0
+    We try to find this:
+    INIT:0000000140A16082 48 83 65 E8 00                                and     [rbp+var_18], 0
+    INIT:0000000140A16087 48 B8 FF FF FF FF FF FF FF FE                 mov     rax, 0FEFFFFFFFFFFFFFFh
+    */
+
+    auto KiVerifyScopesExecuteMid = FIND_PATTERN(InitBase, InitSize, "\x48\x83\xCC\xCC\x00\x48\xB8\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFE");
+    if (KiVerifyScopesExecuteMid != nullptr)
+    {
+        auto KiVerifyScopesExecute = FindFunctionStart(ImageBase, KiVerifyScopesExecuteMid);
+        if (KiVerifyScopesExecute != nullptr)
+        {
+            PatchReturn0(KiVerifyScopesExecute);
+        }
+        else
+        {
+            Die();
+        }
+    }
+    else
+    {
+        Die();
+    }
+
+    /*
+    nt!KiMcaDeferredRecoveryService
+    .text:00000001401CCA30 33 C0                                         xor     eax, eax
+    .text:00000001401CCA32 8B D8                                         mov     ebx, eax
+    .text:00000001401CCA34 8B F8                                         mov     edi, eax
+    .text:00000001401CCA36 8B E8                                         mov     ebp, eax
+    .text:00000001401CCA38 4C 8B D0                                      mov     r10, rax
+    */
+
+    auto KiMcaDeferredRecoveryService = FIND_PATTERN(TextBase, TextSize, "\x33\xC0\x8B\xD8\x8B\xF8\x8B\xE8\x4C\x8B\xD0");
+    if (KiMcaDeferredRecoveryService != nullptr)
+    {
+        // Find the callers of this function
+        uint8_t* Callers[] = { 0, 0 };
+        for (size_t i = 0, count = 0; i + 5 < TextSize; i++)
+        {
+            auto Address = TextBase + i;
+            if (*Address == 0xE8) // call disp32
+            {
+                auto Displacement = *(int32_t*)(Address + 1);
+                auto CallDestination = Address + Displacement + 5;
+                if (CallDestination == KiMcaDeferredRecoveryService)
+                {
+                    // Skip over the call
+                    i += 4;
+
+                    // There should not be more than two callers
+                    count++;
+                    if (count > 2)
+                    {
+                        Die();
+                    }
+
+                    // Patch out the caller functions at the start
+                    auto CallerFunction = FindFunctionStart(ImageBase, Address);
+                    if (CallerFunction != nullptr)
+                    {
+                        PatchReturn0(CallerFunction);
+                    }
+                    else
+                    {
+                        Die();
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        Die();
+    }
 }
 
 static void DisableDSE(void* ImageBase, uint64_t ImageSize)
 {
+    auto PageSection = FindSection(ImageBase, "PAGE");
+    if (PageSection == nullptr)
+    {
+        Die();
+    }
+    auto PageBase = RVA<uint8_t*>(ImageBase, PageSection->VirtualAddress);
+    auto PageSize = PageSection->Misc.VirtualSize;
+
     /*
     nt!SepInitializeCodeIntegrity
     PAGE:0000000140799EBB 4C 8D 05 DE 39 48 00   lea     r8, SeCiCallbacks
@@ -56,7 +173,7 @@ static void DisableDSE(void* ImageBase, uint64_t ImageSize)
     PAGE:0000000140799EC4 48 FF 15 95 71 99 FF   call    cs:__imp_CiInitialize
     */
 
-    auto CiInitializeCall = FIND_PATTERN(ImageBase, ImageSize, "\x4C\x8D\x05\xCC\xCC\xCC\xCC\x8B\xCF");
+    auto CiInitializeCall = FIND_PATTERN(PageBase, PageSize, "\x4C\x8D\x05\xCC\xCC\xCC\xCC\x8B\xCF");
 
     if (CiInitializeCall != nullptr)
     {
@@ -80,7 +197,7 @@ static void DisableDSE(void* ImageBase, uint64_t ImageSize)
     PAGE:00000001406EBD20                  SeValidateImageData endp
     */
 
-    auto SeValidateImageDataRet = FIND_PATTERN(ImageBase, ImageSize, "\x48\x83\xC4\x48\xC3\xCC\xB8\x28\x04\x00\xC0");
+    auto SeValidateImageDataRet = FIND_PATTERN(PageBase, PageSize, "\x48\x83\xC4\x48\xC3\xCC\xB8\x28\x04\x00\xC0");
 
     if (SeValidateImageDataRet != nullptr)
     {
@@ -184,7 +301,7 @@ static void PatchSelfIntegrity(void* ImageBase, uint64_t ImageSize)
     .text:000000001002AE76 33 FF                 xor     edi, edi
     .text:000000001002AE78 48 83 65 C8 00        and     qword ptr [rbp+Device.Type], 0
     .text:000000001002AE7D 48 83 65 48 00        and     [rbp+arg_10], 0
-    We try to find this first:
+    We try to find this:
     .text:000000001002AE82 83 4D 38 FF           or      [rbp+arg_0], 0FFFFFFFFh
     .text:000000001002AE86 83 4D 40 FF           or      [rbp+a1], 0FFFFFFFFh
     */

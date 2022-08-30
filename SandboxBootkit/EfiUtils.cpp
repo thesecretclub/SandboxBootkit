@@ -201,6 +201,30 @@ uint8_t* FindFunctionStart(void* ImageBase, void* Address)
     return RVA<uint8_t*>(ImageBase, FoundEntry->BeginAddress);
 }
 
+EFI_IMAGE_SECTION_HEADER* FindSection(void* ImageBase, const char* SectionName)
+{
+    auto NtHeaders = GetNtHeaders(ImageBase);
+    if (NtHeaders == nullptr)
+    {
+        return nullptr;
+    }
+
+    auto NumberOfSections = NtHeaders->FileHeader.NumberOfSections;
+    auto Sections = RVA<EFI_IMAGE_SECTION_HEADER*>(&NtHeaders->OptionalHeader, NtHeaders->FileHeader.SizeOfOptionalHeader);
+    for (int i = 0; i < NumberOfSections; i++)
+    {
+        auto Section = &Sections[i];
+        char Name[9] = {};
+        memcpy(Name, Section->Name, 8);
+        if (strcmp(Name, SectionName) == 0)
+        {
+            return Section;
+        }
+    }
+
+    return nullptr;
+}
+
 bool ComparePattern(uint8_t* Base, uint8_t* Pattern, size_t PatternLen)
 {
     for (; PatternLen; ++Base, ++Pattern, PatternLen--)
@@ -231,7 +255,7 @@ uint8_t* FindPattern(uint8_t* Base, size_t Size, uint8_t* Pattern, size_t Patter
     return nullptr;
 }
 
-void Die()
+void __declspec(noreturn) Die()
 {
     // At least one of these should kill the VM
     __fastfail(1);
