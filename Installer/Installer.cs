@@ -206,31 +206,11 @@ namespace Installer
                         Info("Bootkit installed: " + bootmgfwPath);
                         Console.WriteLine("Success!");
 
-                        void UpdateBcdFile(string root)
-                        {
-                            Info($"Setting NOINTEGRITYCHECKS in {root}");
-                            var bcdFolder = Path.Combine(root, "EFI", "Microsoft", "Boot");
-                            var bcdPath = Path.Combine(bcdFolder, "BCD");
-                            if (!File.Exists(bcdPath))
-                                Error($"Not found: {bcdPath}");
-                            var bakPath = bcdPath + ".bak";
-                            if (!File.Exists(bakPath))
-                                File.Copy(bcdPath, bakPath);
-                            var bcdeditResult = Exec("bcdedit", $"/store \"{bcdPath}\" /set {{bootmgr}} nointegritychecks on");
-                            Console.WriteLine(bcdeditResult.Output.Trim());
-                            if (bcdeditResult.ExitCode != 0)
-                                Error($"Failed to update: {bcdPath}");
-                        }
-
-                        if (Directory.Exists(debugLayer))
-                            UpdateBcdFile(debugLayer);
-                        UpdateBcdFile(Path.Combine(baseLayer, "Files"));
-
                         // Without this the sandbox can use a snapshot and load the original bootmgfw.efi
-                        Info($"Deleting sandbox snapshots");
                         var snapshotFolder = Path.Combine(guid, "Snapshot");
                         if (Directory.Exists(snapshotFolder))
                         {
+                            Info($"Deleting sandbox snapshots");
                             Directory.Delete(snapshotFolder, true);
                             Info($"Restarting CmService");
                             Exec("sc", "stop CmService");

