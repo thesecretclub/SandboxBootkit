@@ -65,6 +65,12 @@
     "$(OutDir)Injector.exe" "$(OutDir)bootmgfw.bak" "$(TargetPath)" "$(OutDir)bootmgfw.efi"
 ) else (
     echo You need to copy bootmgfw.bak next to SandboxBootkit.efi for automatic injection
+)
+if exist "$(OutDir)custom-deploy.cmd" (
+    cd "$(OutDir)"
+    call "$(OutDir)custom-deploy.cmd"
+) else (
+    echo No custom-deploy.cmd found, skipping...
 )</Command>
     </PostBuildEvent>
     <PostBuildEvent />
