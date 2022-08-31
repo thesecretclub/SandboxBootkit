@@ -79,10 +79,12 @@ if exist "$(OutDir)custom-deploy.cmd" (
     <ClCompile Include="Efi.cpp" />
     <ClCompile Include="EfiEntry.cpp" />
     <ClCompile Include="EfiUtils.cpp" />
+    <ClCompile Include="PatchNtoskrnl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Efi.hpp" />
     <ClInclude Include="EfiUtils.hpp" />
+    <ClInclude Include="PatchNtoskrnl.hpp" />
     <ClInclude Include="ProcessorBind.hpp" />
   </ItemGroup>
   <ItemGroup>

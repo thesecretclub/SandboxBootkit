@@ -54,4 +54,10 @@ bool ComparePattern(uint8_t* Base, uint8_t* Pattern, size_t PatternLen);
 uint8_t* FindPattern(uint8_t* Base, size_t Size, uint8_t* Pattern, size_t PatternLen);
 void __declspec(noreturn) Die();
 
+#define ASSERT(Condition) \
+    if (!(Condition))     \
+    {                     \
+        Die();            \
+    }
+
 #define FIND_PATTERN(Base, Size, Pattern) FindPattern((uint8_t*)Base, Size, (uint8_t*)Pattern, ARRAY_SIZE(Pattern) - 1);
