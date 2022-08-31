@@ -1,6 +1,6 @@
 # SandboxBootkit
 
-Bootkit tested on [Windows Sandbox](https://docs.microsoft.com/en-us/windows/security/threat-protection/windows-sandbox/windows-sandbox-overview) to patch `ntoskrnl.exe` and disable DSE/PatchGuard.
+Bootkit tested on [Windows Sandbox](https://docs.microsoft.com/en-us/windows/security/threat-protection/windows-sandbox/windows-sandbox-overview) to patch `ntoskrnl.exe` and disable DSE/PatchGuard. There is a [blog post](https://secret.club/2022/08/29/bootkitting-windows-sandbox.html) going into more detail about the implementation.
 
 ## Getting started
 
