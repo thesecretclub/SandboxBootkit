@@ -154,6 +154,73 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
     {
         Die();
     }
+
+    /*
+    nt!CcInitializeBcbProfiler
+    INIT:0000000140A19354 40 55                                         push    rbp
+    INIT:0000000140A19356 53                                            push    rbx
+    INIT:0000000140A19357 56                                            push    rsi
+    INIT:0000000140A19358 57                                            push    rdi
+    INIT:0000000140A19359 41 54                                         push    r12
+    INIT:0000000140A1935B 41 55                                         push    r13
+    INIT:0000000140A1935D 41 56                                         push    r14
+    INIT:0000000140A1935F 41 57                                         push    r15
+    INIT:0000000140A19361 48 8D 6C 24 E1                                lea     rbp, [rsp-1Fh]
+    INIT:0000000140A19366 48 81 EC B8 00 00 00                          sub     rsp, 0B8h
+    INIT:0000000140A1936D 48 B8 D4 02 00 00 80 F7 FF FF                 mov     rax, offset SharedUserData.KdDebuggerEnabled
+    */
+
+    auto CcInitializeBcbProfilerMid = FIND_PATTERN(InitBase, InitSize, "\x48\xB8\xD4\x02\x00\x00\x80\xF7\xFF\xFF");
+    if (CcInitializeBcbProfilerMid != nullptr)
+    {
+        auto CcInitializeBcbProfiler = FindFunctionStart(ImageBase, CcInitializeBcbProfilerMid);
+        if (CcInitializeBcbProfiler != nullptr)
+        {
+            memcpy(CcInitializeBcbProfiler, "\xB0\x01\xC3", 3); // mov al, 1; ret
+        }
+        else
+        {
+            Die();
+        }
+    }
+    else
+    {
+        Die();
+    }
+
+    /*
+    nt!ExpLicenseWatchInitWorker
+    INIT:0000000140A44DF0 48 89 5C 24 08                                mov     [rsp+arg_0], rbx
+    INIT:0000000140A44DF5 48 89 6C 24 10                                mov     [rsp+arg_8], rbp
+    INIT:0000000140A44DFA 48 89 74 24 18                                mov     [rsp+arg_10], rsi
+    INIT:0000000140A44DFF 57                                            push    rdi
+    INIT:0000000140A44E00 48 83 EC 30                                   sub     rsp, 30h
+    INIT:0000000140A44E04 0F AE E8                                      lfence
+    INIT:0000000140A44E07 48 8B 05 B2 8E 2B 00                          mov     rax, cs:KiProcessorBlock
+    INIT:0000000140A44E0E 48 8B 70 78                                   mov     rsi, [rax+78h]
+    INIT:0000000140A44E12 48 8B 68 70                                   mov     rbp, [rax+70h]
+    INIT:0000000140A44E16 48 83 60 78 00                                and     qword ptr [rax+78h], 0
+    INIT:0000000140A44E1B 48 83 60 70 00                                and     qword ptr [rax+70h], 0
+    INIT:0000000140A44E20 A0 D4 02 00 00 80 F7 FF FF                    mov     al, ds:SharedUserData.KdDebuggerEnabled
+    */
+
+    auto ExpLicenseWatchInitWorkerMid = FIND_PATTERN(InitBase, InitSize, "\x48\xB8\xD4\x02\x00\x00\x80\xF7\xFF\xFF");
+    if (ExpLicenseWatchInitWorkerMid != nullptr)
+    {
+        auto ExpLicenseWatchInitWorker = FindFunctionStart(ImageBase, ExpLicenseWatchInitWorkerMid);
+        if (ExpLicenseWatchInitWorker != nullptr)
+        {
+            PatchReturn0(ExpLicenseWatchInitWorker);
+        }
+        else
+        {
+            Die();
+        }
+    }
+    else
+    {
+        Die();
+    }
 }
 
 static void DisableDSE(void* ImageBase, uint64_t ImageSize)
