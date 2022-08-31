@@ -83,7 +83,7 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
     ASSERT(KiMcaDeferredRecoveryService != nullptr);
 
     // Find the callers of this function
-    uint8_t* Callers[] = { 0, 0 };
+    int CallerCount = 0;
     for (size_t i = 0, Count = 0; i + 5 < TextSize; i++)
     {
         auto Address = TextBase + i;
@@ -97,8 +97,7 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
                 i += 4;
 
                 // There should not be more than two callers
-                Count++;
-                ASSERT(Count <= 2);
+                CallerCount++;
 
                 // Patch out the caller functions at the start
                 auto CallerFunction = FindFunctionStart(ImageBase, Address);
@@ -108,6 +107,7 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
             }
         }
     }
+    ASSERT(CallerCount == 2);
 
     /*
     nt!CcInitializeBcbProfiler
