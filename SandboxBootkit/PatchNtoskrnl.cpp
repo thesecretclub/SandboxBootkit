@@ -21,18 +21,23 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
     auto TextSize = TextSection->Misc.VirtualSize;
 
     /*
-    nt!KeInitAmd64SpecificState
-    INIT:0000000140A4F601 8B C2                  mov     eax, edx
-    INIT:0000000140A4F603 99                     cdq
-    INIT:0000000140A4F604 41 F7 F8               idiv    r8d
-    INIT:0000000140A4F607 89 44 24 30            mov     [rsp+28h+arg_0], eax
-    INIT:0000000140A4F60B EB 00                  jmp     short $+2
+    nt!KiInitPGContextCaller
+    INIT:0000000140A359E0 40 53                  push    rbx
+    INIT:0000000140A359E2 48 83 EC 30            sub     rsp, 30h
+    INIT:0000000140A359E6 8B 41 18               mov     eax, [rcx+18h]
+    INIT:0000000140A359E9 48 8B D9               mov     rbx, rcx
+    INIT:0000000140A359EC 4C 8B 49 10            mov     r9, [rcx+10h]
+    INIT:0000000140A359F0 44 8B 41 08            mov     r8d, [rcx+8]
+    INIT:0000000140A359F4 8B 51 04               mov     edx, [rcx+4]
+    INIT:0000000140A359F7 8B 09                  mov     ecx, [rcx]
+    INIT:0000000140A359F9 89 44 24 20            mov     [rsp+38h+var_18], eax
+    INIT:0000000140A359FD E8 E2 54 FE FF         call    KiInitPGContext
     */
-    auto KeInitAmd64SpecificStateJmp = FIND_PATTERN(InitBase, InitSize, "\x8B\xC2\x99\x41\xF7\xF8");
-    ASSERT(KeInitAmd64SpecificStateJmp != nullptr);
+    auto KiInitPGContextCaller = FIND_PATTERN(InitBase, InitSize, "\x40\x53\x48\x83\xEC\x30\x8B\x41\x18");
+    ASSERT(KiInitPGContextCaller != nullptr);
 
-    // Prevent the mov from modifying the return address
-    memset(RVA<void*>(KeInitAmd64SpecificStateJmp, 6), 0x90, 4); // nop x4
+    // Force KiInitPGContext to return successful (this is the new patch)
+    memcpy(RVA<void*>(KiInitPGContextCaller, 29), "\xB0\x01\x90\x90\x90", 5); // mov al, 1; nop x3
 
     /*
     nt!KiSwInterrupt
@@ -46,30 +51,6 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
 
     // Prevent KiSwInterruptDispatch from being executed
     memset(KiSwInterruptDispatchCall, 0x90, 11); // nop x11
-
-    /*
-    nt!KiVerifyScopesExecute
-    INIT:0000000140A16060 48 8B C4                                      mov     rax, rsp
-    INIT:0000000140A16063 48 89 58 08                                   mov     [rax+8], rbx
-    INIT:0000000140A16067 48 89 70 10                                   mov     [rax+10h], rsi
-    INIT:0000000140A1606B 48 89 78 18                                   mov     [rax+18h], rdi
-    INIT:0000000140A1606F 4C 89 78 20                                   mov     [rax+20h], r15
-    INIT:0000000140A16073 55                                            push    rbp
-    INIT:0000000140A16074 48 8B EC                                      mov     rbp, rsp
-    INIT:0000000140A16077 48 83 EC 60                                   sub     rsp, 60h
-    INIT:0000000140A1607B 83 65 F4 00                                   and     [rbp+var_C], 0
-    INIT:0000000140A1607F 0F 57 C0                                      xorps   xmm0, xmm0
-    We try to find this:
-    INIT:0000000140A16082 48 83 65 E8 00                                and     [rbp+var_18], 0
-    INIT:0000000140A16087 48 B8 FF FF FF FF FF FF FF FE                 mov     rax, 0FEFFFFFFFFFFFFFFh
-    */
-    auto KiVerifyScopesExecuteMid = FIND_PATTERN(InitBase, InitSize, "\x48\x83\xCC\xCC\x00\x48\xB8\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFE");
-    ASSERT(KiVerifyScopesExecuteMid != nullptr);
-
-    auto KiVerifyScopesExecute = FindFunctionStart(ImageBase, KiVerifyScopesExecuteMid);
-    ASSERT(KiVerifyScopesExecute != nullptr);
-
-    PatchReturn0(KiVerifyScopesExecute);
 
     /*
     nt!KiMcaDeferredRecoveryService
@@ -108,51 +89,6 @@ static void DisablePatchGuard(void* ImageBase, uint64_t ImageSize)
         }
     }
     ASSERT(CallerCount == 2);
-
-    /*
-    nt!CcInitializeBcbProfiler
-    INIT:0000000140A19354 40 55                                         push    rbp
-    INIT:0000000140A19356 53                                            push    rbx
-    INIT:0000000140A19357 56                                            push    rsi
-    INIT:0000000140A19358 57                                            push    rdi
-    INIT:0000000140A19359 41 54                                         push    r12
-    INIT:0000000140A1935B 41 55                                         push    r13
-    INIT:0000000140A1935D 41 56                                         push    r14
-    INIT:0000000140A1935F 41 57                                         push    r15
-    INIT:0000000140A19361 48 8D 6C 24 E1                                lea     rbp, [rsp-1Fh]
-    INIT:0000000140A19366 48 81 EC B8 00 00 00                          sub     rsp, 0B8h
-    INIT:0000000140A1936D 48 B8 D4 02 00 00 80 F7 FF FF                 mov     rax, offset SharedUserData.KdDebuggerEnabled
-    */
-    auto CcInitializeBcbProfilerMid = FIND_PATTERN(InitBase, InitSize, "\x48\xB8\xD4\x02\x00\x00\x80\xF7\xFF\xFF");
-    ASSERT(CcInitializeBcbProfilerMid != nullptr);
-
-    auto CcInitializeBcbProfiler = FindFunctionStart(ImageBase, CcInitializeBcbProfilerMid);
-    ASSERT(CcInitializeBcbProfiler != nullptr);
-
-    memcpy(CcInitializeBcbProfiler, "\xB0\x01\xC3", 3); // mov al, 1; ret
-
-    /*
-    nt!ExpLicenseWatchInitWorker
-    INIT:0000000140A44DF0 48 89 5C 24 08                                mov     [rsp+arg_0], rbx
-    INIT:0000000140A44DF5 48 89 6C 24 10                                mov     [rsp+arg_8], rbp
-    INIT:0000000140A44DFA 48 89 74 24 18                                mov     [rsp+arg_10], rsi
-    INIT:0000000140A44DFF 57                                            push    rdi
-    INIT:0000000140A44E00 48 83 EC 30                                   sub     rsp, 30h
-    INIT:0000000140A44E04 0F AE E8                                      lfence
-    INIT:0000000140A44E07 48 8B 05 B2 8E 2B 00                          mov     rax, cs:KiProcessorBlock
-    INIT:0000000140A44E0E 48 8B 70 78                                   mov     rsi, [rax+78h]
-    INIT:0000000140A44E12 48 8B 68 70                                   mov     rbp, [rax+70h]
-    INIT:0000000140A44E16 48 83 60 78 00                                and     qword ptr [rax+78h], 0
-    INIT:0000000140A44E1B 48 83 60 70 00                                and     qword ptr [rax+70h], 0
-    INIT:0000000140A44E20 A0 D4 02 00 00 80 F7 FF FF                    mov     al, ds:SharedUserData.KdDebuggerEnabled
-    */
-    auto ExpLicenseWatchInitWorkerMid = FIND_PATTERN(InitBase, InitSize, "\x48\xB8\xD4\x02\x00\x00\x80\xF7\xFF\xFF");
-    ASSERT(ExpLicenseWatchInitWorkerMid != nullptr);
-
-    auto ExpLicenseWatchInitWorker = FindFunctionStart(ImageBase, ExpLicenseWatchInitWorkerMid);
-    ASSERT(ExpLicenseWatchInitWorker != nullptr);
-
-    PatchReturn0(ExpLicenseWatchInitWorker);
 }
 
 static void DisableDSE(void* ImageBase, uint64_t ImageSize)
@@ -214,7 +150,7 @@ static void DisableDSE(void* ImageBase, uint64_t ImageSize)
 
 void PatchNtoskrnl(void* ImageBase, uint64_t ImageSize)
 {
-    // These patch locations are the same as EfiGuard:
+    // Many of these patches come from EfiGuard:
     // https://github.com/Mattiwatti/EfiGuard/blob/25bb182026d24944713e36f129a93d08397de913/EfiGuardDxe/PatchNtoskrnl.c
     DisablePatchGuard(ImageBase, ImageSize);
     DisableDSE(ImageBase, ImageSize);
