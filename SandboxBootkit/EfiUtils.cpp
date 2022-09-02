@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "Efi.hpp"
 
 EFI_IMAGE_NT_HEADERS64* GetNtHeaders(void* ImageBase)
@@ -92,6 +94,7 @@ void* GetExport(void* ImageBase, const char* FunctionName, const char* ModuleNam
 
 bool FixRelocations(void* ImageBase, uint64_t ImageBaseDelta)
 {
+    // Check if relocations are already applied to the image
     if (ImageBaseDelta == 0)
     {
         return true;
@@ -147,6 +150,81 @@ bool FixRelocations(void* ImageBase, uint64_t ImageBaseDelta)
     return true;
 }
 
+struct RUNTIME_FUNCTION
+{
+    uint32_t BeginAddress;
+    uint32_t EndAddress;
+    uint32_t UnwindInfo;
+};
+
+#define RUNTIME_FUNCTION_INDIRECT 0x1
+
+uint8_t* FindFunctionStart(void* ImageBase, void* Address)
+{
+    auto NtHeaders = GetNtHeaders(ImageBase);
+    if (NtHeaders == nullptr)
+    {
+        return nullptr;
+    }
+
+    auto ExceptionDirectory = &NtHeaders->OptionalHeader.DataDirectory[EFI_IMAGE_DIRECTORY_ENTRY_EXCEPTION];
+    if (ExceptionDirectory->VirtualAddress == 0 || ExceptionDirectory->Size == 0)
+    {
+        return nullptr;
+    }
+
+    // Do a binary search to find the RUNTIME_FUNCTION
+    auto Rva = (uint32_t)((uint8_t*)Address - (uint8_t*)ImageBase);
+    auto Begin = RVA<RUNTIME_FUNCTION*>(ImageBase, ExceptionDirectory->VirtualAddress);
+    auto End = Begin + ExceptionDirectory->Size / sizeof(RUNTIME_FUNCTION);
+    auto FoundEntry = std::lower_bound(Begin, End, Rva, [](const RUNTIME_FUNCTION& Entry, uint32_t Rva)
+        {
+            return Entry.EndAddress < Rva;
+        });
+
+    // Make sure the found entry is in-range
+    // See: https://en.cppreference.com/w/cpp/algorithm/lower_bound
+    if (FoundEntry == End || Rva < FoundEntry->BeginAddress)
+    {
+        return nullptr;
+    }
+
+    // Resolve indirect function entries back to the owning entry
+    // See: https://github.com/dotnet/runtime/blob/d5e3a5c2ca46691d65c81d520cb95f13f7a94652/src/coreclr/vm/codeman.cpp#L4403-L4416
+    // As a sidenote, this seems to be why functions addresses have to be aligned?
+    if ((FoundEntry->UnwindInfo & RUNTIME_FUNCTION_INDIRECT) != 0)
+    {
+        auto OwningEntryRva = FoundEntry->UnwindInfo - RUNTIME_FUNCTION_INDIRECT;
+        FoundEntry = RVA<RUNTIME_FUNCTION*>(ImageBase, OwningEntryRva);
+    }
+
+    return RVA<uint8_t*>(ImageBase, FoundEntry->BeginAddress);
+}
+
+EFI_IMAGE_SECTION_HEADER* FindSection(void* ImageBase, const char* SectionName)
+{
+    auto NtHeaders = GetNtHeaders(ImageBase);
+    if (NtHeaders == nullptr)
+    {
+        return nullptr;
+    }
+
+    auto NumberOfSections = NtHeaders->FileHeader.NumberOfSections;
+    auto Sections = RVA<EFI_IMAGE_SECTION_HEADER*>(&NtHeaders->OptionalHeader, NtHeaders->FileHeader.SizeOfOptionalHeader);
+    for (int i = 0; i < NumberOfSections; i++)
+    {
+        auto Section = &Sections[i];
+        char Name[9] = {};
+        memcpy(Name, Section->Name, 8);
+        if (strcmp(Name, SectionName) == 0)
+        {
+            return Section;
+        }
+    }
+
+    return nullptr;
+}
+
 bool ComparePattern(uint8_t* Base, uint8_t* Pattern, size_t PatternLen)
 {
     for (; PatternLen; ++Base, ++Pattern, PatternLen--)
@@ -177,7 +255,7 @@ uint8_t* FindPattern(uint8_t* Base, size_t Size, uint8_t* Pattern, size_t Patter
     return nullptr;
 }
 
-void Die()
+void __declspec(noreturn) Die()
 {
     // At least one of these should kill the VM
     __fastfail(1);
