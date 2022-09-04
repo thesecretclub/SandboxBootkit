@@ -4,28 +4,25 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SandboxBootkit", "SandboxBootkit\SandboxBootkit.vcxproj", "{00F9B865-9986-4D9C-BB53-7BB826522896}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1FC97804-FF0D-40F9-A772-213A46DFA1EC} = {1FC97804-FF0D-40F9-A772-213A46DFA1EC}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Installer", "Installer\Installer.csproj", "{D3606CE8-4338-40BB-9CFD-20D931339BA0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Injector", "Injector\Injector.vcxproj", "{7D9F180E-70D2-4B1E-92CD-F462027D8C75}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Injector", "Injector\Injector.csproj", "{1FC97804-FF0D-40F9-A772-213A46DFA1EC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Release|x64 = Release|x64
-		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{00F9B865-9986-4D9C-BB53-7BB826522896}.Release|x64.ActiveCfg = Release|x64
 		{00F9B865-9986-4D9C-BB53-7BB826522896}.Release|x64.Build.0 = Release|x64
-		{00F9B865-9986-4D9C-BB53-7BB826522896}.Release|x86.ActiveCfg = Release|x64
-		{00F9B865-9986-4D9C-BB53-7BB826522896}.Release|x86.Build.0 = Release|x64
 		{D3606CE8-4338-40BB-9CFD-20D931339BA0}.Release|x64.ActiveCfg = Release|x64
 		{D3606CE8-4338-40BB-9CFD-20D931339BA0}.Release|x64.Build.0 = Release|x64
-		{D3606CE8-4338-40BB-9CFD-20D931339BA0}.Release|x86.ActiveCfg = Release|x64
-		{D3606CE8-4338-40BB-9CFD-20D931339BA0}.Release|x86.Build.0 = Release|x64
-		{7D9F180E-70D2-4B1E-92CD-F462027D8C75}.Release|x64.ActiveCfg = Release|x64
-		{7D9F180E-70D2-4B1E-92CD-F462027D8C75}.Release|x64.Build.0 = Release|x64
-		{7D9F180E-70D2-4B1E-92CD-F462027D8C75}.Release|x86.ActiveCfg = Release|x64
+		{1FC97804-FF0D-40F9-A772-213A46DFA1EC}.Release|x64.ActiveCfg = Release|Any CPU
+		{1FC97804-FF0D-40F9-A772-213A46DFA1EC}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
