@@ -207,17 +207,37 @@ namespace Installer
                         Console.WriteLine("Success!");
 
                         // Without this the sandbox can use a snapshot and load the original bootmgfw.efi
-                        var snapshotFolder = Path.Combine(programData, "Microsoft", "Windows", "Containers", "Snapshots");
-                        if (Directory.Exists(snapshotFolder))
-                        {
-                            Info($"Deleting sandbox snapshots subfolders");
+                        // Win10: Containers/BaseImages/{GUID}/Snapshot
+                        // Win11: Microsoft/Windows/Containers/Snapshots/{GUID}
+                        var snapshotFolderWin11 = Path.Combine(programData, "Microsoft", "Windows", "Containers", "Snapshots");
+                        var snapshotFolderWin10 = Path.Combine(guid, "Snapshot");
+                        var snapshotDeleted = false;
 
-                            // Get all subdirectories in the snapshot folder
-                            foreach (var dir in Directory.GetDirectories(snapshotFolder))
+                        if (Directory.Exists(snapshotFolderWin11))
+                        {
+                            foreach(var snapshot in Directory.EnumerateDirectories(snapshotFolderWin11))
                             {
-                                Directory.Delete(dir, true);
+                                Directory.Delete(snapshot, true);
+                                Info($"Deleted snapshot: {snapshot}");
                             }
 
+                            snapshotDeleted = true;
+                        }
+                        else if (Directory.Exists(snapshotFolderWin10))
+                        {
+                            Directory.Delete(snapshotFolderWin10, true);
+
+                            Info($"Delted snapshot folder: {snapshotFolderWin10}");
+
+                            snapshotDeleted = true;
+                        }
+                        else
+                        {
+                            Info($"Snapshot folder not found: {snapshotFolderWin11} or {snapshotFolderWin10}, not restarting CmService");
+                        }
+
+                        if (snapshotDeleted)
+                        {
                             Info($"Restarting CmService");
                             Exec("sc", "stop CmService");
                             WaitForService("CmService", "STOPPED");
