@@ -207,11 +207,17 @@ namespace Installer
                         Console.WriteLine("Success!");
 
                         // Without this the sandbox can use a snapshot and load the original bootmgfw.efi
-                        var snapshotFolder = Path.Combine(guid, "Snapshot");
+                        var snapshotFolder = Path.Combine(programData, "Microsoft", "Windows", "Containers", "Snapshots");
                         if (Directory.Exists(snapshotFolder))
                         {
-                            Info($"Deleting sandbox snapshots");
-                            Directory.Delete(snapshotFolder, true);
+                            Info($"Deleting sandbox snapshots subfolders");
+
+                            // Get all subdirectories in the snapshot folder
+                            foreach (var dir in Directory.GetDirectories(snapshotFolder))
+                            {
+                                Directory.Delete(dir, true);
+                            }
+
                             Info($"Restarting CmService");
                             Exec("sc", "stop CmService");
                             WaitForService("CmService", "STOPPED");
