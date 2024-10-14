@@ -191,7 +191,7 @@ namespace Installer
                         if (!File.Exists(sandboxBootkit))
                             Error($"Bootkit not found ${sandboxBootkit}, please compile SandboxBootkit");
 
-                        var injector = Path.Combine(basePath, "Injector.exe");
+                        var injector = Path.Combine(basePath, "Injector", "Injector.exe");
                         if (!File.Exists(injector))
                             Error($"Injector not found: {injector}");
                         var bootkitPath = Path.Combine(basePath, "bootmgfw.efi");
